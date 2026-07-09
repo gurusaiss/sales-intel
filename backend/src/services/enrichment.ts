@@ -1,5 +1,6 @@
 import { EnrichmentResult } from "../types";
 import { HunterEnrichmentProvider } from "./providers/hunter";
+import { SnovEnrichmentProvider } from "./providers/snov";
 
 /**
  * Enrichment is provider-agnostic by design: swapping the mock provider for
@@ -88,10 +89,14 @@ function slug(s: string): string {
 const mockProvider = new MockEnrichmentProvider();
 
 export function getEnrichmentProvider(domain?: string): EnrichmentProvider {
-  // Hunter needs a domain to do a real lookup. Without one, real results aren't
-  // possible, so we fall back to mock rather than guessing a domain and being wrong.
+  // All real providers need a domain to do a real lookup. Without one, real
+  // results aren't possible, so we fall back to mock rather than guessing a
+  // domain and being wrong. Hunter takes priority if both keys are set.
   if (process.env.HUNTER_API_KEY && domain) {
     return new HunterEnrichmentProvider(process.env.HUNTER_API_KEY);
+  }
+  if (process.env.SNOV_CLIENT_ID && process.env.SNOV_CLIENT_SECRET && domain) {
+    return new SnovEnrichmentProvider(process.env.SNOV_CLIENT_ID, process.env.SNOV_CLIENT_SECRET);
   }
   return mockProvider;
 }
