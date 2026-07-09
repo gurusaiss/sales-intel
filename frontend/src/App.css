@@ -1,0 +1,277 @@
+:root {
+  --ink: #1c1a17;
+  --paper: #f7f5f1;
+  --card: #ffffff;
+  --border: #e3ddd2;
+  --muted: #756e60;
+  --accent: #b5560f;
+  --accent-soft: #f1e2d3;
+  --mono: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
+  --sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --ink: #f0ece3;
+    --paper: #17150f;
+    --card: #221f18;
+    --border: #3a352a;
+    --muted: #a89d87;
+    --accent: #e08a3e;
+    --accent-soft: #3a2c1a;
+  }
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  background: var(--paper);
+  color: var(--ink);
+  font-family: var(--sans);
+}
+
+.app {
+  max-width: 760px;
+  margin: 0 auto;
+  padding: 3rem 1.5rem 5rem;
+  display: flex;
+  flex-direction: column;
+  gap: 2rem;
+}
+
+.app-header {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.eyebrow {
+  font-family: var(--mono);
+  font-size: 0.75rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--accent);
+}
+
+h1 {
+  font-size: 1.75rem;
+  margin: 0;
+  text-wrap: balance;
+}
+
+.search-form {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-top: 0.5rem;
+}
+
+.search-form input {
+  padding: 0.7rem 0.9rem;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--card);
+  color: var(--ink);
+  font-size: 0.95rem;
+}
+
+.query-input {
+  flex: 2 1 260px;
+}
+
+.domain-input {
+  flex: 1 1 200px;
+}
+
+.form-hint {
+  font-family: var(--mono);
+  font-size: 0.75rem;
+  color: var(--muted);
+  margin: 0.4rem 0 0;
+}
+
+.search-form input:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+
+.search-form button {
+  padding: 0.7rem 1.25rem;
+  border: none;
+  border-radius: 6px;
+  background: var(--accent);
+  color: #fff;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.search-form button:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+
+.search-form button:focus-visible {
+  outline: 2px solid var(--ink);
+  outline-offset: 2px;
+}
+
+.error-banner {
+  padding: 0.75rem 1rem;
+  border: 1px solid #c0392b;
+  border-radius: 6px;
+  color: #c0392b;
+  font-size: 0.9rem;
+}
+
+.empty-state {
+  color: var(--muted);
+  font-size: 0.9rem;
+  line-height: 1.6;
+  max-width: 55ch;
+}
+
+.empty-state code {
+  font-family: var(--mono);
+  background: var(--accent-soft);
+  padding: 0.1rem 0.35rem;
+  border-radius: 4px;
+}
+
+.result {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.card {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 1.25rem 1.5rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.card.highlight {
+  border-left: 3px solid var(--accent);
+}
+
+.card h2 {
+  margin: 0;
+  font-size: 1.2rem;
+}
+
+.card-label {
+  font-family: var(--mono);
+  font-size: 0.7rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--accent);
+}
+
+.subline {
+  color: var(--muted);
+  margin: 0;
+  font-size: 0.92rem;
+}
+
+.field-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 0.75rem 1.5rem;
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+}
+
+.field-label {
+  font-family: var(--mono);
+  font-size: 0.7rem;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.field-value {
+  font-size: 0.9rem;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.field-value a {
+  color: var(--ink);
+}
+
+.badge {
+  font-family: var(--mono);
+  font-size: 0.65rem;
+  padding: 0.1rem 0.4rem;
+  border-radius: 4px;
+  text-transform: uppercase;
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+
+.link-row {
+  display: flex;
+  gap: 1rem;
+  font-size: 0.85rem;
+}
+
+.link-row a {
+  color: var(--accent);
+}
+
+.tag-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+}
+
+.tag {
+  font-family: var(--mono);
+  font-size: 0.75rem;
+  padding: 0.2rem 0.55rem;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  color: var(--muted);
+}
+
+.signal-list ul {
+  margin: 0.3rem 0 0;
+  padding-left: 1.1rem;
+  font-size: 0.9rem;
+  line-height: 1.6;
+}
+
+.draft-subject {
+  font-weight: 600;
+  margin: 0;
+}
+
+.draft-body {
+  font-family: var(--sans);
+  white-space: pre-wrap;
+  background: var(--paper);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 0.9rem 1rem;
+  margin: 0;
+  font-size: 0.9rem;
+  line-height: 1.6;
+}
+
+.sources {
+  font-family: var(--mono);
+  font-size: 0.75rem;
+  color: var(--muted);
+  text-align: right;
+}

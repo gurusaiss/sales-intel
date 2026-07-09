@@ -1,0 +1,23 @@
+{
+  "manifest_version": 3,
+  "name": "Relationship Intelligence — LinkedIn Follow-up Assistant",
+  "version": "0.1.0",
+  "description": "Click-to-capture LinkedIn conversations and draft AI follow-ups. No background scraping, no auto-send — every action is user-initiated and reviewed before sending.",
+  "permissions": ["storage", "activeTab"],
+  "host_permissions": ["https://www.linkedin.com/*", "http://localhost:4000/*"],
+  "background": {
+    "service_worker": "background.js"
+  },
+  "content_scripts": [
+    {
+      "matches": ["https://www.linkedin.com/messaging/*"],
+      "js": ["content.js"],
+      "css": ["content.css"],
+      "run_at": "document_idle"
+    }
+  ],
+  "action": {
+    "default_popup": "popup.html",
+    "default_title": "Follow-up Assistant"
+  }
+}

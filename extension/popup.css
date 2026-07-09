@@ -1,0 +1,76 @@
+:root {
+  --ink: #1c1a17;
+  --paper: #f7f5f1;
+  --card: #ffffff;
+  --border: #e3ddd2;
+  --muted: #756e60;
+  --accent: #b5560f;
+  --accent-soft: #f1e2d3;
+}
+
+body {
+  width: 320px;
+  margin: 0;
+  background: var(--paper);
+  color: var(--ink);
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  font-size: 0.85rem;
+}
+
+header {
+  padding: 0.9rem 1rem 0.6rem;
+}
+
+h1 {
+  font-size: 1rem;
+  margin: 0 0 0.3rem;
+}
+
+.sub {
+  color: var(--muted);
+  font-size: 0.72rem;
+  margin: 0;
+  line-height: 1.4;
+}
+
+#list {
+  display: flex;
+  flex-direction: column;
+  max-height: 380px;
+  overflow-y: auto;
+}
+
+.person-row {
+  padding: 0.7rem 1rem;
+  border-top: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+}
+
+.person-row .name {
+  font-weight: 600;
+}
+
+.person-row .meta {
+  color: var(--muted);
+  font-size: 0.72rem;
+}
+
+.status-pill {
+  display: inline-block;
+  font-size: 0.65rem;
+  padding: 0.1rem 0.4rem;
+  border-radius: 999px;
+  background: var(--accent-soft);
+  color: var(--accent);
+  text-transform: uppercase;
+  width: fit-content;
+}
+
+.empty {
+  padding: 1.5rem 1rem;
+  color: var(--muted);
+  text-align: center;
+  font-size: 0.8rem;
+}

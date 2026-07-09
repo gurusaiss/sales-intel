@@ -1,0 +1,136 @@
+#ria-followup-button {
+  position: fixed;
+  bottom: 24px;
+  right: 24px;
+  z-index: 999999;
+  background: #b5560f;
+  color: #fff;
+  border: none;
+  border-radius: 999px;
+  padding: 0.75rem 1.25rem;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  font-size: 0.9rem;
+  font-weight: 600;
+  cursor: pointer;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.25);
+}
+
+#ria-followup-button:hover {
+  background: #9c4a0c;
+}
+
+#ria-followup-panel {
+  position: fixed;
+  bottom: 80px;
+  right: 24px;
+  z-index: 999999;
+  width: 340px;
+  max-height: 80vh;
+  overflow-y: auto;
+  background: #ffffff;
+  color: #1c1a17;
+  border: 1px solid #e3ddd2;
+  border-radius: 10px;
+  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.3);
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  font-size: 0.85rem;
+}
+
+#ria-followup-panel .ria-panel-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0.75rem 1rem;
+  border-bottom: 1px solid #e3ddd2;
+  font-weight: 600;
+}
+
+#ria-followup-panel .ria-close {
+  background: none;
+  border: none;
+  font-size: 1.1rem;
+  cursor: pointer;
+  color: #756e60;
+}
+
+#ria-followup-panel .ria-panel-body {
+  padding: 0.9rem 1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+}
+
+#ria-followup-panel label {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  font-size: 0.75rem;
+  color: #756e60;
+}
+
+#ria-followup-panel label.ria-inline {
+  flex-direction: row;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+#ria-followup-panel input,
+#ria-followup-panel textarea,
+#ria-followup-panel select {
+  font-family: inherit;
+  font-size: 0.85rem;
+  padding: 0.4rem 0.5rem;
+  border: 1px solid #e3ddd2;
+  border-radius: 6px;
+  color: #1c1a17;
+}
+
+#ria-followup-panel .ria-generate {
+  background: #b5560f;
+  color: #fff;
+  border: none;
+  border-radius: 6px;
+  padding: 0.55rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+#ria-followup-panel .ria-status {
+  font-size: 0.75rem;
+  color: #756e60;
+  min-height: 1em;
+}
+
+#ria-followup-panel .ria-result {
+  border-top: 1px solid #e3ddd2;
+  padding-top: 0.6rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+#ria-followup-panel .ria-copy {
+  background: #f1e2d3;
+  color: #b5560f;
+  border: none;
+  border-radius: 6px;
+  padding: 0.45rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+#ria-followup-panel .ria-hint {
+  font-size: 0.72rem;
+  color: #756e60;
+  margin: 0;
+}
+
+#ria-followup-panel .ria-dnc {
+  background: none;
+  border: 1px solid #c0392b;
+  color: #c0392b;
+  border-radius: 6px;
+  padding: 0.4rem;
+  font-size: 0.75rem;
+  cursor: pointer;
+}
