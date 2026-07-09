@@ -5,6 +5,7 @@
 
 const BUTTON_ID = "ria-followup-button";
 const PANEL_ID = "ria-followup-panel";
+const ESCALATE_THRESHOLD = 2;
 
 function injectButton() {
   if (document.getElementById(BUTTON_ID)) return;
@@ -105,6 +106,12 @@ function renderPanel(extracted) {
           <button class="ria-dnc">Mark do-not-contact</button>
         </div>
       </div>
+      <div class="ria-escalate" hidden>
+        <p class="ria-hint">Still no reply after ${ESCALATE_THRESHOLD}+ follow-ups. Check their company's public site for another way to reach them?</p>
+        <label>Company domain<input class="ria-escalate-domain" type="text" placeholder="acme.com" /></label>
+        <button class="ria-escalate-btn">Check other channels</button>
+        <div class="ria-escalate-result"></div>
+      </div>
     </div>
   `;
 
@@ -114,6 +121,7 @@ function renderPanel(extracted) {
   panel.querySelector(".ria-generate").addEventListener("click", () => handleGenerate(panel));
   panel.querySelector(".ria-copy").addEventListener("click", () => handleCopy(panel));
   panel.querySelector(".ria-dnc").addEventListener("click", () => handleDoNotContact(panel));
+  panel.querySelector(".ria-escalate-btn").addEventListener("click", () => handleEscalate(panel));
 }
 
 function handleGenerate(panel) {
@@ -152,6 +160,51 @@ function handleGenerate(panel) {
     resultEl.hidden = false;
     resultEl.querySelector(".ria-draft-text").value = response.data.draft;
     panel.dataset.linkedinUrl = linkedinUrl;
+
+    const escalateEl = panel.querySelector(".ria-escalate");
+    const followUpCount = response.data.person?.followUpCount ?? 0;
+    escalateEl.hidden = followUpCount < ESCALATE_THRESHOLD;
+    if (response.data.person?.companyDomain) {
+      panel.querySelector(".ria-escalate-domain").value = response.data.person.companyDomain;
+    }
+  });
+}
+
+function handleEscalate(panel) {
+  const linkedinUrl = panel.dataset.linkedinUrl;
+  const domain = panel.querySelector(".ria-escalate-domain").value.trim();
+  const resultEl = panel.querySelector(".ria-escalate-result");
+
+  if (!linkedinUrl) {
+    resultEl.textContent = "Generate a draft first so this person is on file.";
+    return;
+  }
+  if (!domain) {
+    resultEl.textContent = "Enter a company domain to check.";
+    return;
+  }
+
+  resultEl.textContent = "Checking public contact info…";
+
+  chrome.runtime.sendMessage({ type: "ESCALATE", linkedinUrl, domain }, (response) => {
+    if (!response?.ok) {
+      resultEl.textContent = response?.error || "Failed to check other channels.";
+      return;
+    }
+
+    const { suggestedAction, contactPageUrl, bookingUrl, emailDraft, person } = response.data;
+
+    if (suggestedAction === "booking_available") {
+      resultEl.innerHTML = `Found a public booking page: <a href="${escapeAttr(bookingUrl)}" target="_blank">${escapeHtml(bookingUrl)}</a>. Review and book manually — nothing here submits on your behalf.`;
+    } else if (suggestedAction === "email_available") {
+      resultEl.innerHTML = `Found a public email: <strong>${escapeHtml(person?.publicEmail ?? "")}</strong>${contactPageUrl ? ` · <a href="${escapeAttr(contactPageUrl)}" target="_blank">contact page</a>` : ""}${
+        emailDraft
+          ? `<br/><br/><em>${escapeHtml(emailDraft.subject)}</em><br/>${escapeHtml(emailDraft.body).replace(/\n/g, "<br/>")}`
+          : ""
+      }`;
+    } else {
+      resultEl.textContent = "No public contact page, email, or booking link found on their site.";
+    }
   });
 }
 

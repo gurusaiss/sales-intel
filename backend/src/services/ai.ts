@@ -86,6 +86,39 @@ export async function generateFollowUpDraft(person: CrmPerson): Promise<string> 
   return text || followUpFallback(person);
 }
 
+export async function generateChannelSwitchEmail(
+  person: CrmPerson,
+  targetEmail: string
+): Promise<{ subject: string; body: string }> {
+  const prompt = `You are drafting a first email to someone who never replied to your LinkedIn messages. You found their public business email and are now trying a different channel.
+
+RECIPIENT: ${person.name}${person.role ? `, ${person.role}` : ""}${person.company ? ` at ${person.company}` : ""}
+PRIOR LINKEDIN ATTEMPTS: ${person.followUpCount}
+LAST LINKEDIN MESSAGE SENT: ${
+    [...person.messages].reverse().find((m) => m.direction === "outbound")?.text ?? "(none captured)"
+  }
+
+Write a short email (under 100 words) that naturally references trying LinkedIn first without sounding awkward about it. Respond in this exact format:
+SUBJECT: <subject line>
+BODY: <email body>`;
+
+  const text = await callGroq(prompt, 350);
+  if (text) {
+    const subjectMatch = text.match(/SUBJECT:\s*([\s\S]*?)(?=BODY:|$)/i);
+    const bodyMatch = text.match(/BODY:\s*([\s\S]*)/i);
+    if (subjectMatch && bodyMatch) {
+      return { subject: subjectMatch[1].trim(), body: bodyMatch[1].trim() };
+    }
+  }
+
+  return {
+    subject: `Following up${person.company ? ` — ${person.company}` : ""}`,
+    body: `Hi ${person.name.split(" ")[0]},\n\nI reached out on LinkedIn a little while back but wanted to try email in case it's easier to catch you here. ${
+      person.company ? `Still keen to connect about ${person.company}.` : "Would love to reconnect."
+    }\n\nLet me know if you have 15 minutes this week.\n\nBest,\n[Your name]`,
+  };
+}
+
 function buildFollowUpPrompt(person: CrmPerson): string {
   const spec = getTemplateSpec(person.templateCategory);
   const history = person.messages
