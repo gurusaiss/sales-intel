@@ -4,7 +4,11 @@
   "version": "0.1.0",
   "description": "Click-to-capture LinkedIn conversations and draft AI follow-ups. No background scraping, no auto-send — every action is user-initiated and reviewed before sending.",
   "permissions": ["storage", "activeTab"],
-  "host_permissions": ["https://www.linkedin.com/*", "http://localhost:4000/*"],
+  "host_permissions": [
+    "https://www.linkedin.com/*",
+    "https://sales-intel-backend-ctvc.onrender.com/*",
+    "http://localhost:4000/*"
+  ],
   "background": {
     "service_worker": "background.js"
   },

@@ -26,4 +26,4 @@ services:
     staticPublishPath: dist
     envVars:
       - key: VITE_API_BASE
-        value: https://sales-intel-backend.onrender.com
+        value: https://sales-intel-backend-ctvc.onrender.com
