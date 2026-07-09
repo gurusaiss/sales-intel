@@ -7,9 +7,19 @@ services:
     buildCommand: npm install && npm run build
     startCommand: npm start
     envVars:
-      - key: ANTHROPIC_API_KEY
+      - key: GROQ_API_KEY
         sync: false
-      - key: ANTHROPIC_MODEL
-        value: claude-sonnet-4-5
+      - key: GROQ_MODEL
+        value: llama-3.3-70b-versatile
       - key: HUNTER_API_KEY
         sync: false
+
+  - type: web
+    name: sales-intel-frontend
+    runtime: static
+    rootDir: frontend
+    buildCommand: npm install && npm run build
+    staticPublishPath: dist
+    envVars:
+      - key: VITE_API_BASE
+        value: https://sales-intel-backend.onrender.com

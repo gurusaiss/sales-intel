@@ -2,48 +2,51 @@ import { EnrichmentResult } from "../types";
 import { CrmPerson } from "../types/crm";
 import { getTemplateSpec } from "./templates";
 
-const ANTHROPIC_API_KEY = process.env.ANTHROPIC_API_KEY;
-const ANTHROPIC_MODEL = process.env.ANTHROPIC_MODEL || "claude-sonnet-4-5";
+const GROQ_API_KEY = process.env.GROQ_API_KEY;
+const GROQ_MODEL = process.env.GROQ_MODEL || "llama-3.3-70b-versatile";
+const GROQ_ENDPOINT = "https://api.groq.com/openai/v1/chat/completions";
 
 interface AiOutput {
   aiSummary: string;
   outreachDraft: { subject: string; body: string };
 }
 
-export async function generateResearchOutput(enrichment: EnrichmentResult): Promise<AiOutput> {
-  if (!ANTHROPIC_API_KEY) {
-    return templateFallback(enrichment);
-  }
-
-  const prompt = buildPrompt(enrichment);
+async function callGroq(prompt: string, maxTokens: number): Promise<string | null> {
+  if (!GROQ_API_KEY) return null;
 
   try {
-    const res = await fetch("https://api.anthropic.com/v1/messages", {
+    const res = await fetch(GROQ_ENDPOINT, {
       method: "POST",
       headers: {
         "content-type": "application/json",
-        "x-api-key": ANTHROPIC_API_KEY,
-        "anthropic-version": "2023-06-01",
+        authorization: `Bearer ${GROQ_API_KEY}`,
       },
       body: JSON.stringify({
-        model: ANTHROPIC_MODEL,
-        max_tokens: 800,
+        model: GROQ_MODEL,
+        max_tokens: maxTokens,
         messages: [{ role: "user", content: prompt }],
       }),
     });
 
     if (!res.ok) {
-      console.error("Anthropic API error", res.status, await res.text());
-      return templateFallback(enrichment);
+      console.error("Groq API error", res.status, await res.text());
+      return null;
     }
 
-    const data = (await res.json()) as { content: Array<{ type: string; text?: string }> };
-    const text = data.content.find((c) => c.type === "text")?.text ?? "";
-    return parseModelOutput(text, enrichment);
+    const data = (await res.json()) as {
+      choices: Array<{ message: { content: string } }>;
+    };
+    return data.choices[0]?.message?.content?.trim() ?? null;
   } catch (err) {
-    console.error("AI generation failed, falling back to template", err);
-    return templateFallback(enrichment);
+    console.error("Groq request failed", err);
+    return null;
   }
+}
+
+export async function generateResearchOutput(enrichment: EnrichmentResult): Promise<AiOutput> {
+  const text = await callGroq(buildPrompt(enrichment), 800);
+  if (!text) return templateFallback(enrichment);
+  return parseModelOutput(text, enrichment);
 }
 
 function buildPrompt(enrichment: EnrichmentResult): string {
@@ -79,39 +82,8 @@ function parseModelOutput(text: string, enrichment: EnrichmentResult): AiOutput 
 }
 
 export async function generateFollowUpDraft(person: CrmPerson): Promise<string> {
-  if (!ANTHROPIC_API_KEY) {
-    return followUpFallback(person);
-  }
-
-  const prompt = buildFollowUpPrompt(person);
-
-  try {
-    const res = await fetch("https://api.anthropic.com/v1/messages", {
-      method: "POST",
-      headers: {
-        "content-type": "application/json",
-        "x-api-key": ANTHROPIC_API_KEY,
-        "anthropic-version": "2023-06-01",
-      },
-      body: JSON.stringify({
-        model: ANTHROPIC_MODEL,
-        max_tokens: 400,
-        messages: [{ role: "user", content: prompt }],
-      }),
-    });
-
-    if (!res.ok) {
-      console.error("Anthropic API error (follow-up)", res.status, await res.text());
-      return followUpFallback(person);
-    }
-
-    const data = (await res.json()) as { content: Array<{ type: string; text?: string }> };
-    const text = data.content.find((c) => c.type === "text")?.text?.trim();
-    return text || followUpFallback(person);
-  } catch (err) {
-    console.error("Follow-up generation failed, falling back to template", err);
-    return followUpFallback(person);
-  }
+  const text = await callGroq(buildFollowUpPrompt(person), 400);
+  return text || followUpFallback(person);
 }
 
 function buildFollowUpPrompt(person: CrmPerson): string {
