@@ -1,9 +1,13 @@
 import { useState, type FormEvent } from "react";
 import { searchQuery } from "./api";
 import type { ResearchResponse } from "./types";
+import QueueView from "./QueueView";
 import "./App.css";
 
+type Tab = "research" | "queue";
+
 function App() {
+  const [tab, setTab] = useState<Tab>("research");
   const [query, setQuery] = useState("");
   const [domain, setDomain] = useState("");
   const [loading, setLoading] = useState(false);
@@ -30,44 +34,67 @@ function App() {
     <div className="app">
       <header className="app-header">
         <span className="eyebrow">Sales Intelligence — Research MVP</span>
-        <h1>Look up a person or company</h1>
-        <form className="search-form" onSubmit={handleSubmit}>
-          <input
-            type="text"
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
-            placeholder="e.g. John Doe or Northwind Analytics Inc."
-            aria-label="Search query"
-            className="query-input"
-          />
-          <input
-            type="text"
-            value={domain}
-            onChange={(e) => setDomain(e.target.value)}
-            placeholder="Company domain (optional) — acme.com"
-            aria-label="Company domain"
-            className="domain-input"
-          />
-          <button type="submit" disabled={loading}>
-            {loading ? "Researching…" : "Research"}
+        <h1>{tab === "research" ? "Look up a person or company" : "Outreach queue"}</h1>
+        <nav className="tab-row" aria-label="View">
+          <button
+            className={`tab-button ${tab === "research" ? "active" : ""}`}
+            onClick={() => setTab("research")}
+          >
+            Research
           </button>
-        </form>
-        <p className="form-hint">
-          {domain.trim()
-            ? "Domain provided — this search will use real Hunter.io data if HUNTER_API_KEY is set."
-            : "No domain — this search uses mock data. Add a company domain for real Hunter.io lookups."}
-        </p>
+          <button
+            className={`tab-button ${tab === "queue" ? "active" : ""}`}
+            onClick={() => setTab("queue")}
+          >
+            Queue
+          </button>
+        </nav>
+
+        {tab === "research" && (
+          <>
+            <form className="search-form" onSubmit={handleSubmit}>
+              <input
+                type="text"
+                value={query}
+                onChange={(e) => setQuery(e.target.value)}
+                placeholder="e.g. John Doe or Northwind Analytics Inc."
+                aria-label="Search query"
+                className="query-input"
+              />
+              <input
+                type="text"
+                value={domain}
+                onChange={(e) => setDomain(e.target.value)}
+                placeholder="Company domain (optional) — acme.com"
+                aria-label="Company domain"
+                className="domain-input"
+              />
+              <button type="submit" disabled={loading}>
+                {loading ? "Researching…" : "Research"}
+              </button>
+            </form>
+            <p className="form-hint">
+              {domain.trim()
+                ? "Domain provided — this search will use real Hunter.io data if HUNTER_API_KEY is set."
+                : "No domain — this search uses mock data. Add a company domain for real Hunter.io lookups."}
+            </p>
+          </>
+        )}
       </header>
 
-      {error && <div className="error-banner">{error}</div>}
-
-      {result && <ResultView result={result} />}
-
-      {!result && !error && !loading && (
-        <p className="empty-state">
-          Enter a name or company to generate a research profile, AI summary, and a draft outreach
-          email.
-        </p>
+      {tab === "research" ? (
+        <>
+          {error && <div className="error-banner">{error}</div>}
+          {result && <ResultView result={result} />}
+          {!result && !error && !loading && (
+            <p className="empty-state">
+              Enter a name or company to generate a research profile, AI summary, and a draft
+              outreach email.
+            </p>
+          )}
+        </>
+      ) : (
+        <QueueView />
       )}
     </div>
   );

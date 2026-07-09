@@ -188,4 +188,36 @@ router.post("/persons/:linkedinUrl/escalate", async (req, res) => {
   }
 });
 
+/**
+ * Batch queue: generates a fresh draft for every no-reply person at once, so
+ * the human can rapid-review and copy-paste-send through the list instead of
+ * opening each LinkedIn thread one at a time. Still zero auto-send — this
+ * only prepares text, nothing here ever touches LinkedIn or an inbox.
+ */
+router.get("/queue", async (req, res) => {
+  const limit = Math.min(Number(req.query.limit) || 15, 30);
+
+  try {
+    const all = await listPersons();
+    const pending = all
+      .filter((p) => p.status === "no_reply")
+      .sort((a, b) => {
+        if (b.priority !== a.priority) return b.priority - a.priority;
+        return new Date(a.updatedAt).getTime() - new Date(b.updatedAt).getTime();
+      })
+      .slice(0, limit);
+
+    const queue = [];
+    for (const person of pending) {
+      const draft = await generateFollowUpDraft(person);
+      queue.push({ person, draft });
+    }
+
+    res.json({ queue, totalPending: all.filter((p) => p.status === "no_reply").length });
+  } catch (err) {
+    console.error("Queue generation failed", err);
+    res.status(500).json({ error: "Failed to build queue." });
+  }
+});
+
 export default router;

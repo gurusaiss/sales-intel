@@ -47,3 +47,39 @@ export interface ResearchResponse {
     body: string;
   };
 }
+
+export type TemplateCategory =
+  | "ceo"
+  | "founder"
+  | "recruiter"
+  | "hr"
+  | "investor"
+  | "sir"
+  | "madam"
+  | "unclassified";
+
+export type ContactStatus = "no_reply" | "replied" | "booked" | "closed" | "do_not_contact";
+
+export interface CrmPerson {
+  id: string;
+  linkedinUrl: string;
+  name: string;
+  company?: string;
+  role?: string;
+  templateCategory: TemplateCategory;
+  priority: number;
+  followUpCount: number;
+  status: ContactStatus;
+  publicEmail?: string;
+  updatedAt: string;
+}
+
+export interface QueueItem {
+  person: CrmPerson;
+  draft: string;
+}
+
+export interface QueueResponse {
+  queue: QueueItem[];
+  totalPending: number;
+}
