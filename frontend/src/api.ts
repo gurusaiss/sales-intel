@@ -35,3 +35,31 @@ export async function updatePersonStatus(
   });
   await handleResponse(res);
 }
+
+export interface GoogleStatus {
+  configured: boolean;
+  connected: boolean;
+}
+
+export async function fetchGoogleStatus(): Promise<GoogleStatus> {
+  const res = await fetch(`${API_BASE}/api/auth/google/status`);
+  return handleResponse(res);
+}
+
+export function getGoogleConnectUrl(): string {
+  return `${API_BASE}/api/auth/google`;
+}
+
+export async function sendViaGmail(
+  to: string,
+  subject: string,
+  body: string,
+  linkedinUrl?: string
+): Promise<void> {
+  const res = await fetch(`${API_BASE}/api/send-email`, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ to, subject, body, linkedinUrl }),
+  });
+  await handleResponse(res);
+}

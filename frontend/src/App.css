@@ -357,3 +357,36 @@ h1 {
   outline: 2px solid var(--accent);
   outline-offset: 1px;
 }
+
+.ghost-button.accent {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #fff;
+}
+
+.ghost-button.accent:hover {
+  opacity: 0.9;
+  background: var(--accent);
+}
+
+.ghost-button:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+.gmail-banner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 0.75rem 1rem;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--accent-soft);
+  font-size: 0.85rem;
+}
+
+.gmail-banner a {
+  text-decoration: none;
+  white-space: nowrap;
+}
