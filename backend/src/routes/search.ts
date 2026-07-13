@@ -2,6 +2,7 @@ import { Router } from "express";
 import { z } from "zod";
 import { getEnrichmentProvider } from "../services/enrichment";
 import { generateResearchOutput } from "../services/ai";
+import { fetchGrowthSignals } from "../services/newsSignals";
 import { ResearchResponse } from "../types";
 import { requireApiKey } from "../middleware/apiKey";
 
@@ -28,6 +29,15 @@ router.post("/search", requireApiKey, async (req, res) => {
   try {
     const provider = getEnrichmentProvider(domain);
     const enrichment = await provider.lookup(parsed.data.query, domain);
+
+    if (enrichment.company) {
+      const realSignals = await fetchGrowthSignals(enrichment.company.name);
+      if (realSignals.length > 0) {
+        enrichment.company.newsSignals = realSignals;
+        enrichment.sources = [...enrichment.sources, "hacker-news"];
+      }
+    }
+
     const { aiSummary, outreachDraft } = await generateResearchOutput(enrichment);
 
     const response: ResearchResponse = { enrichment, aiSummary, outreachDraft };

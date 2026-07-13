@@ -2,9 +2,11 @@ import { Router } from "express";
 import { z } from "zod";
 import {
   captureOrUpdatePerson,
+  findDuplicatesByName,
   findPersonByIdentity,
   getPerson,
   listPersons,
+  mergePersons,
   updatePerson,
 } from "../services/personStore";
 import { generateFollowUpDraft, generateChannelSwitchEmail } from "../services/ai";
@@ -171,11 +173,47 @@ router.post("/draft", requireApiKey, async (req, res) => {
     }
 
     const draft = await generateFollowUpDraft(person);
-    res.json({ person, templateUsed: person.templateCategory, draft });
+    const possibleDuplicates = await findDuplicatesByName(person.name, person.id);
+
+    res.json({
+      person,
+      templateUsed: person.templateCategory,
+      draft,
+      possibleDuplicates: possibleDuplicates.map((p) => ({
+        id: p.id,
+        linkedinUrl: p.linkedinUrl,
+        name: p.name,
+        status: p.status,
+        followUpCount: p.followUpCount,
+      })),
+    });
   } catch (err) {
     console.error("Draft generation failed", err);
     res.status(500).json({ error: "Failed to generate draft." });
   }
+});
+
+const mergeSchema = z.object({
+  keepLinkedinUrl: z.string().trim().url(),
+  mergeLinkedinUrl: z.string().trim().url(),
+});
+
+/**
+ * Combines a duplicate record into the canonical one and deletes the
+ * duplicate. Always an explicit user action from the merge prompt — a name
+ * match alone isn't proof of identity, so this never runs automatically.
+ */
+router.post("/persons/merge", requireApiKey, async (req, res) => {
+  const parsed = mergeSchema.safeParse(req.body);
+  if (!parsed.success) {
+    return res.status(400).json({ error: parsed.error.issues[0]?.message ?? "Invalid request" });
+  }
+
+  const merged = await mergePersons(parsed.data.keepLinkedinUrl, parsed.data.mergeLinkedinUrl);
+  if (!merged) {
+    return res.status(404).json({ error: "One or both persons not found, or same person given twice." });
+  }
+  res.json({ person: merged });
 });
 
 const escalateSchema = z.object({

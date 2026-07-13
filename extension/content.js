@@ -106,6 +106,7 @@ function renderPanel(extracted) {
           <button class="ria-dnc">Mark do-not-contact</button>
         </div>
       </div>
+      <div class="ria-duplicate" hidden></div>
       <div class="ria-escalate" hidden>
         <p class="ria-hint">Still no reply after ${ESCALATE_THRESHOLD}+ follow-ups. Check their company's public site for another way to reach them?</p>
         <label>Company domain<input class="ria-escalate-domain" type="text" placeholder="acme.com" /></label>
@@ -167,7 +168,55 @@ function handleGenerate(panel) {
     if (response.data.person?.companyDomain) {
       panel.querySelector(".ria-escalate-domain").value = response.data.person.companyDomain;
     }
+
+    renderDuplicates(panel, linkedinUrl, response.data.possibleDuplicates || []);
   });
+}
+
+function renderDuplicates(panel, keepLinkedinUrl, duplicates) {
+  const dupEl = panel.querySelector(".ria-duplicate");
+  if (duplicates.length === 0) {
+    dupEl.hidden = true;
+    dupEl.innerHTML = "";
+    return;
+  }
+
+  dupEl.hidden = false;
+  dupEl.innerHTML = `
+    <p class="ria-hint">Possible duplicate — same name already tracked under a different LinkedIn URL:</p>
+    ${duplicates
+      .map(
+        (d) => `
+      <div class="ria-dup-row">
+        <span>${escapeHtml(d.name)} — ${escapeHtml(d.status.replace("_", " "))}, ${d.followUpCount} follow-up${d.followUpCount === 1 ? "" : "s"}</span>
+        <button class="ria-merge-btn" data-merge-url="${escapeAttr(d.linkedinUrl)}">Merge into this record</button>
+      </div>
+    `
+      )
+      .join("")}
+  `;
+
+  dupEl.querySelectorAll(".ria-merge-btn").forEach((btn) => {
+    btn.addEventListener("click", () => handleMerge(panel, keepLinkedinUrl, btn.dataset.mergeUrl));
+  });
+}
+
+function handleMerge(panel, keepLinkedinUrl, mergeLinkedinUrl) {
+  const dupEl = panel.querySelector(".ria-duplicate");
+  dupEl.querySelector("p").textContent = "Merging…";
+
+  chrome.runtime.sendMessage(
+    { type: "MERGE_PERSONS", keepLinkedinUrl, mergeLinkedinUrl },
+    (response) => {
+      if (!response?.ok) {
+        dupEl.querySelector("p").textContent = response?.error || "Merge failed.";
+        return;
+      }
+      dupEl.hidden = true;
+      dupEl.innerHTML = "";
+      panel.querySelector(".ria-status").textContent = "Merged. Combined history is now on this record.";
+    }
+  );
 }
 
 function handleEscalate(panel) {

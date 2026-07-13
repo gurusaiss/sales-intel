@@ -52,6 +52,21 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
     return true;
   }
 
+  if (message.type === "MERGE_PERSONS") {
+    forwardResponse(
+      fetch(`${API_BASE}/api/persons/merge`, {
+        method: "POST",
+        headers: authHeaders({ "content-type": "application/json" }),
+        body: JSON.stringify({
+          keepLinkedinUrl: message.keepLinkedinUrl,
+          mergeLinkedinUrl: message.mergeLinkedinUrl,
+        }),
+      }),
+      sendResponse
+    );
+    return true;
+  }
+
   if (message.type === "PATCH_PERSON") {
     const encodedUrl = encodeURIComponent(message.linkedinUrl);
     forwardResponse(

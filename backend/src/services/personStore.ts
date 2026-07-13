@@ -69,6 +69,80 @@ export async function findPersonByIdentity(params: {
 }
 
 /**
+ * Finds other tracked people with the same name but a different LinkedIn
+ * URL — a real gap this schema has no other way to catch: LinkedIn profile
+ * URLs can change (vanity slug edits) or get captured with slightly
+ * different formatting, silently splitting one person into two records.
+ */
+export async function findDuplicatesByName(
+  name: string,
+  excludeId: string
+): Promise<CrmPerson[]> {
+  const all = await listPersons();
+  const nameLower = name.trim().toLowerCase();
+  return all.filter((p) => p.id !== excludeId && p.name.trim().toLowerCase() === nameLower);
+}
+
+/**
+ * Merges one duplicate record into another: combines message history, notes,
+ * meetings, and follow-up count, keeps the more advanced status (e.g. a
+ * "replied" record wins over a "no_reply" one), then deletes the duplicate.
+ * Always an explicit user action — never triggered automatically, since a
+ * name match alone isn't proof two records are actually the same person.
+ */
+export async function mergePersons(
+  keepLinkedinUrl: string,
+  mergeLinkedinUrl: string
+): Promise<CrmPerson | undefined> {
+  const all = await readAll();
+  const keepId = idFromUrl(keepLinkedinUrl);
+  const mergeId = idFromUrl(mergeLinkedinUrl);
+
+  const keep = all[keepId];
+  const merge = all[mergeId];
+  if (!keep || !merge || keepId === mergeId) return undefined;
+
+  const STATUS_RANK: Record<CrmPerson["status"], number> = {
+    do_not_contact: 5,
+    booked: 4,
+    replied: 3,
+    no_reply: 2,
+    closed: 1,
+  };
+
+  const merged: CrmPerson = {
+    ...keep,
+    messages: [...keep.messages, ...merge.messages].sort(
+      (a, b) => new Date(a.capturedAt).getTime() - new Date(b.capturedAt).getTime()
+    ),
+    notes: [...keep.notes, ...merge.notes],
+    meetings: [...keep.meetings, ...merge.meetings],
+    tags: Array.from(new Set([...keep.tags, ...merge.tags])),
+    followUpCount: keep.followUpCount + merge.followUpCount,
+    status: STATUS_RANK[merge.status] > STATUS_RANK[keep.status] ? merge.status : keep.status,
+    companyDomain: keep.companyDomain ?? merge.companyDomain,
+    publicEmail: keep.publicEmail ?? merge.publicEmail,
+    emailConfidence: keep.emailConfidence ?? merge.emailConfidence,
+    contactPageUrl: keep.contactPageUrl ?? merge.contactPageUrl,
+    bookingUrl: keep.bookingUrl ?? merge.bookingUrl,
+    lastContactedAt: laterOf(keep.lastContactedAt, merge.lastContactedAt),
+    lastReplyAt: laterOf(keep.lastReplyAt, merge.lastReplyAt),
+    updatedAt: new Date().toISOString(),
+  };
+
+  delete all[mergeId];
+  all[keepId] = merged;
+  await writeAll(all);
+  return merged;
+}
+
+function laterOf(a?: string, b?: string): string | undefined {
+  if (!a) return b;
+  if (!b) return a;
+  return new Date(a).getTime() > new Date(b).getTime() ? a : b;
+}
+
+/**
  * Creates the person on first capture, or updates+appends on repeat captures.
  * This is the only write path for LinkedIn-derived data — always triggered by
  * an explicit user action, never a background process.

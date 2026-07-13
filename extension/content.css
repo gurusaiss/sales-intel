@@ -162,3 +162,34 @@
 #ria-followup-panel .ria-escalate-result a {
   color: #b5560f;
 }
+
+#ria-followup-panel .ria-duplicate {
+  border-top: 1px solid #e3ddd2;
+  padding-top: 0.6rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  background: #fdf3e7;
+  margin: 0 -1rem;
+  padding-left: 1rem;
+  padding-right: 1rem;
+}
+
+#ria-followup-panel .ria-dup-row {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+  font-size: 0.78rem;
+}
+
+#ria-followup-panel .ria-merge-btn {
+  align-self: flex-start;
+  background: #b5560f;
+  color: #fff;
+  border: none;
+  border-radius: 6px;
+  padding: 0.35rem 0.7rem;
+  font-size: 0.75rem;
+  font-weight: 600;
+  cursor: pointer;
+}
