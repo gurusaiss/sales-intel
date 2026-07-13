@@ -18,6 +18,13 @@ function injectButton() {
 }
 
 async function onButtonClick() {
+  renderPanel({ name: "", role: "", linkedinUrl: window.location.href.split("?")[0] }, { loading: true });
+
+  // LinkedIn is a heavy client-rendered SPA — the profile header may not have
+  // finished rendering yet even after document_idle. Poll briefly instead of
+  // reading the DOM exactly once.
+  await waitFor(() => document.querySelector("h1") || document.querySelector('meta[property="og:title"]'));
+
   const basics = extractProfileBasics();
   renderPanel(basics, { loading: true });
 
@@ -25,16 +32,44 @@ async function onButtonClick() {
   renderPanel(basics, { loading: false, ...contactInfo });
 }
 
-function extractProfileBasics() {
-  const nameCandidates = ["h1.text-heading-xlarge", "h1"];
-  const name = queryFirstText(nameCandidates);
+function waitFor(predicate, timeoutMs = 3000, intervalMs = 150) {
+  return new Promise((resolve) => {
+    const start = Date.now();
+    const check = () => {
+      if (predicate() || Date.now() - start > timeoutMs) {
+        resolve();
+        return;
+      }
+      setTimeout(check, intervalMs);
+    };
+    check();
+  });
+}
 
-  const roleCandidates = [
-    ".text-body-medium.break-words",
-    ".text-body-medium",
-    ".pv-text-details__left-panel .text-body-medium",
-  ];
-  const role = queryFirstText(roleCandidates);
+/**
+ * LinkedIn's CSS classes are hashed/obfuscated per deployment and change
+ * without notice — relying on them (text-heading-xlarge, etc.) breaks
+ * silently. Page metadata (og:title, meta description) is kept stable
+ * because LinkedIn needs it for link previews/SEO, so it's a far more
+ * durable signal. document.title is the final, always-present fallback.
+ */
+function extractProfileBasics() {
+  const ogTitle = document.querySelector('meta[property="og:title"]')?.content ?? "";
+  const description = document.querySelector('meta[name="description"]')?.content ?? "";
+  const pageTitle = document.title;
+
+  // og:title is typically "First Last - Headline | Company" or similar.
+  const name =
+    queryFirstText(["h1"]) ||
+    ogTitle.split(/[-|]/)[0]?.trim() ||
+    pageTitle.split(/[-|]/)[0]?.trim() ||
+    "";
+
+  const role =
+    queryFirstText([".text-body-medium.break-words", ".text-body-medium"]) ||
+    ogTitle.split(/[-|]/).slice(1).join("-").trim() ||
+    description.split(".")[0]?.trim() ||
+    "";
 
   return {
     name,
@@ -60,12 +95,13 @@ function queryFirstText(selectors) {
  * editable in the panel so a bad extraction never blocks the user.
  */
 async function extractContactInfo() {
-  const alreadyOpen = document.querySelector('[href*="contact-info"], .pv-contact-info');
+  const alreadyOpen = document.querySelector('a[href^="mailto:"], a[href^="tel:"]');
   if (!alreadyOpen) {
     const contactLink = findContactInfoLink();
     if (contactLink) {
       contactLink.click();
-      await wait(900);
+      await waitFor(() => document.querySelector('a[href^="mailto:"], a[href^="tel:"], .artdeco-modal'));
+      await wait(300); // let the modal finish rendering its contents after it appears
     }
   }
 
@@ -76,9 +112,16 @@ async function extractContactInfo() {
 }
 
 function findContactInfoLink() {
-  const candidates = document.querySelectorAll("a, button");
+  // LinkedIn has used the id "top-card-text-details-contact-info" on this
+  // link for years — accessibility-oriented ids tend to survive CSS/class
+  // refactors far better than styling classes do. Try that first.
+  const byId = document.getElementById("top-card-text-details-contact-info");
+  if (byId) return byId;
+
+  const candidates = document.querySelectorAll("a, button, [role='button']");
   for (const el of candidates) {
-    if (/contact info/i.test(el.textContent ?? "")) return el;
+    const label = `${el.textContent ?? ""} ${el.getAttribute("aria-label") ?? ""} ${el.getAttribute("title") ?? ""}`;
+    if (/contact info/i.test(label)) return el;
   }
   return null;
 }
