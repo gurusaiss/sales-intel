@@ -75,6 +75,28 @@ h1 {
   font-size: 0.8rem;
 }
 
+.export-row {
+  display: flex;
+  gap: 0.5rem;
+  padding: 0 1rem 0.6rem;
+}
+
+.export-row button {
+  flex: 1;
+  background: transparent;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 0.4rem 0.6rem;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--ink);
+  cursor: pointer;
+}
+
+.export-row button:hover {
+  background: var(--accent-soft);
+}
+
 .nudge-banner {
   margin: 0 1rem 0.6rem;
   padding: 0.6rem 0.75rem;

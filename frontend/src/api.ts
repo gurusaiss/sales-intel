@@ -225,14 +225,12 @@ export async function deleteLeadById(id: string): Promise<void> {
 }
 
 /**
- * Downloads the export as a Blob rather than a plain link — a plain <a href>
+ * Downloads an export as a Blob rather than a plain link — a plain <a href>
  * navigation can't carry the x-api-key header, so it would 401 the moment
  * APP_API_KEY is set on the backend.
  */
-export async function downloadLeadsExport(format: "csv" | "json"): Promise<void> {
-  const res = await fetch(`${API_BASE}/api/leads/export?format=${format}`, {
-    headers: authHeaders(),
-  });
+async function downloadExport(path: string, filename: string): Promise<void> {
+  const res = await fetch(`${API_BASE}${path}`, { headers: authHeaders() });
   if (!res.ok) {
     const body = await res.json().catch(() => ({}));
     throw new Error(body.error ?? `Export failed with status ${res.status}`);
@@ -241,11 +239,19 @@ export async function downloadLeadsExport(format: "csv" | "json"): Promise<void>
   const url = URL.createObjectURL(blob);
   const link = document.createElement("a");
   link.href = url;
-  link.download = `leads.${format}`;
+  link.download = filename;
   document.body.appendChild(link);
   link.click();
   link.remove();
   URL.revokeObjectURL(url);
+}
+
+export function downloadLeadsExport(format: "csv" | "json"): Promise<void> {
+  return downloadExport(`/api/leads/export?format=${format}`, `leads.${format}`);
+}
+
+export function downloadPersonsExport(format: "csv" | "json"): Promise<void> {
+  return downloadExport(`/api/persons/export?format=${format}`, `linkedin-contacts.${format}`);
 }
 
 export interface Resume {

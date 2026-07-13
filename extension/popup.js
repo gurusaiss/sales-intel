@@ -76,6 +76,28 @@ function saveBookingProfile() {
   });
 }
 
+async function exportPersons(format) {
+  try {
+    const res = await fetch(`${API_BASE}/api/persons/export?format=${format}`, {
+      headers: API_KEY ? { "x-api-key": API_KEY } : {},
+    });
+    if (!res.ok) throw new Error(`Export failed (${res.status})`);
+    const blob = await res.blob();
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = `linkedin-contacts.${format}`;
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    URL.revokeObjectURL(url);
+  } catch (err) {
+    document.getElementById("nudge").innerHTML = `<div class="nudge-banner">${err.message}</div>`;
+  }
+}
+
+document.getElementById("export-csv").addEventListener("click", () => exportPersons("csv"));
+document.getElementById("export-json").addEventListener("click", () => exportPersons("json"));
 document.getElementById("booking-save").addEventListener("click", saveBookingProfile);
 loadBookingProfile();
 loadPersons();

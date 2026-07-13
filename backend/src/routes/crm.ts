@@ -70,6 +70,60 @@ router.get("/persons/lookup", requireApiKey, async (req, res) => {
   res.json({ person: match ?? null });
 });
 
+/**
+ * Exports every LinkedIn-captured contact, regardless of status — must be
+ * registered before /:linkedinUrl or Express treats "export" as a URL param.
+ */
+router.get("/persons/export", requireApiKey, async (req, res) => {
+  const format = (req.query.format as string) || "csv";
+  const persons = await listPersons();
+
+  if (format === "json") {
+    res.setHeader("Content-Disposition", "attachment; filename=linkedin-contacts.json");
+    return res.json(persons);
+  }
+
+  const columns = [
+    "name",
+    "role",
+    "company",
+    "companyDomain",
+    "linkedinUrl",
+    "publicEmail",
+    "emailConfidence",
+    "phone",
+    "templateCategory",
+    "status",
+    "priority",
+    "followUpCount",
+    "bookingUrl",
+    "contactPageUrl",
+    "createdAt",
+  ] as const;
+
+  const rows = persons.map((person) =>
+    columns
+      .map((col) => {
+        const value = (person as unknown as Record<string, unknown>)[col];
+        return csvEscape(value == null ? "" : String(value));
+      })
+      .join(",")
+  );
+
+  const csv = [columns.join(","), ...rows].join("\r\n");
+
+  res.setHeader("Content-Type", "text/csv");
+  res.setHeader("Content-Disposition", "attachment; filename=linkedin-contacts.csv");
+  res.send(csv);
+});
+
+function csvEscape(value: string): string {
+  if (/[",\r\n]/.test(value)) {
+    return `"${value.replace(/"/g, '""')}"`;
+  }
+  return value;
+}
+
 router.get("/persons/:linkedinUrl", requireApiKey, async (req, res) => {
   const person = await getPerson(decodeURIComponent(req.params.linkedinUrl));
   if (!person) return res.status(404).json({ error: "Person not found" });

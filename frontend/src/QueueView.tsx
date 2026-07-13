@@ -7,6 +7,7 @@ import {
   sendViaGmail,
   addNote,
   logMeeting,
+  downloadPersonsExport,
   type GoogleStatus,
 } from "./api";
 import type { QueueItem } from "./types";
@@ -90,11 +91,33 @@ export default function QueueView() {
     setTotalPending((current) => current - 1);
   }
 
+  async function handleExport(format: "csv" | "json") {
+    try {
+      await downloadPersonsExport(format);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Export failed");
+    }
+  }
+
   if (loading) return <p className="empty-state">Generating drafts for everyone pending…</p>;
   if (error) return <div className="error-banner">{error}</div>;
 
   return (
     <div className="result">
+      <div className="queue-card-header">
+        <span className="form-hint">
+          Export downloads every LinkedIn contact you've captured, not just what's shown below.
+        </span>
+        <div className="queue-actions">
+          <button className="ghost-button" onClick={() => handleExport("csv")}>
+            Export CSV
+          </button>
+          <button className="ghost-button" onClick={() => handleExport("json")}>
+            Export JSON
+          </button>
+        </div>
+      </div>
+
       {googleStatus?.configured && !googleStatus.connected && (
         <div className="gmail-banner">
           <span>Connect Gmail to send emails directly from the queue instead of copy-paste.</span>
