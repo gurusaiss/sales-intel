@@ -88,3 +88,47 @@ export async function sendViaGmail(
   });
   await handleResponse(res);
 }
+
+export async function addNote(linkedinUrl: string, text: string): Promise<CrmPerson> {
+  const res = await fetch(`${API_BASE}/api/persons/${encodeURIComponent(linkedinUrl)}/notes`, {
+    method: "POST",
+    headers: authHeaders({ "content-type": "application/json" }),
+    body: JSON.stringify({ text }),
+  });
+  const data = await handleResponse<{ person: CrmPerson }>(res);
+  return data.person;
+}
+
+export async function logMeeting(
+  linkedinUrl: string,
+  date: string,
+  type?: string,
+  notes?: string
+): Promise<CrmPerson> {
+  const res = await fetch(`${API_BASE}/api/persons/${encodeURIComponent(linkedinUrl)}/meetings`, {
+    method: "POST",
+    headers: authHeaders({ "content-type": "application/json" }),
+    body: JSON.stringify({ date, type, notes }),
+  });
+  const data = await handleResponse<{ person: CrmPerson }>(res);
+  return data.person;
+}
+
+export interface TemplateStat {
+  category: string;
+  attempted: number;
+  replied: number;
+  booked: number;
+  replyRate: number;
+}
+
+export interface AnalyticsResponse {
+  totalTracked: number;
+  statusCounts: Record<string, number>;
+  templateStats: TemplateStat[];
+}
+
+export async function fetchAnalytics(): Promise<AnalyticsResponse> {
+  const res = await fetch(`${API_BASE}/api/analytics`, { headers: authHeaders() });
+  return handleResponse(res);
+}

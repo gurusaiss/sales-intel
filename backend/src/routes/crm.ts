@@ -94,6 +94,49 @@ router.patch("/persons/:linkedinUrl", requireApiKey, async (req, res) => {
   res.json({ person });
 });
 
+const noteSchema = z.object({
+  text: z.string().trim().min(1),
+});
+
+router.post("/persons/:linkedinUrl/notes", requireApiKey, async (req, res) => {
+  const parsed = noteSchema.safeParse(req.body);
+  if (!parsed.success) {
+    return res.status(400).json({ error: parsed.error.issues[0]?.message ?? "Invalid request" });
+  }
+
+  const linkedinUrl = decodeURIComponent(req.params.linkedinUrl);
+  const person = await getPerson(linkedinUrl);
+  if (!person) return res.status(404).json({ error: "Person not found" });
+
+  const updated = await updatePerson(linkedinUrl, {
+    notes: [...person.notes, { text: parsed.data.text, createdAt: new Date().toISOString() }],
+  });
+  res.json({ person: updated });
+});
+
+const meetingSchema = z.object({
+  date: z.string().trim().min(1),
+  type: z.string().trim().optional(),
+  notes: z.string().trim().optional(),
+});
+
+router.post("/persons/:linkedinUrl/meetings", requireApiKey, async (req, res) => {
+  const parsed = meetingSchema.safeParse(req.body);
+  if (!parsed.success) {
+    return res.status(400).json({ error: parsed.error.issues[0]?.message ?? "Invalid request" });
+  }
+
+  const linkedinUrl = decodeURIComponent(req.params.linkedinUrl);
+  const person = await getPerson(linkedinUrl);
+  if (!person) return res.status(404).json({ error: "Person not found" });
+
+  const updated = await updatePerson(linkedinUrl, {
+    meetings: [...person.meetings, parsed.data],
+    status: "booked",
+  });
+  res.json({ person: updated });
+});
+
 const draftSchema = captureSchema.extend({
   templateOverride: z
     .enum(["ceo", "founder", "recruiter", "hr", "investor", "sir", "madam", "unclassified"])
@@ -237,6 +280,50 @@ router.get("/queue", requireApiKey, async (req, res) => {
     console.error("Queue generation failed", err);
     res.status(500).json({ error: "Failed to build queue." });
   }
+});
+
+/**
+ * Reply-rate-by-template: the single most actionable signal this tool can
+ * surface that generic CRMs don't — which template category actually gets
+ * replies, computed from data already captured, no new integration needed.
+ */
+router.get("/analytics", requireApiKey, async (_req, res) => {
+  const all = await listPersons();
+
+  const byTemplate: Record<
+    string,
+    { attempted: number; replied: number; booked: number }
+  > = {};
+
+  for (const person of all) {
+    if (person.followUpCount === 0) continue; // never actually contacted
+    const key = person.templateCategory;
+    byTemplate[key] ??= { attempted: 0, replied: 0, booked: 0 };
+    byTemplate[key].attempted += 1;
+    if (person.status === "replied" || person.status === "booked" || person.status === "closed") {
+      byTemplate[key].replied += 1;
+    }
+    if (person.status === "booked") {
+      byTemplate[key].booked += 1;
+    }
+  }
+
+  const templateStats = Object.entries(byTemplate).map(([category, stats]) => ({
+    category,
+    ...stats,
+    replyRate: stats.attempted > 0 ? Math.round((stats.replied / stats.attempted) * 100) : 0,
+  }));
+
+  const statusCounts: Record<string, number> = {};
+  for (const person of all) {
+    statusCounts[person.status] = (statusCounts[person.status] ?? 0) + 1;
+  }
+
+  res.json({
+    totalTracked: all.length,
+    statusCounts,
+    templateStats: templateStats.sort((a, b) => b.replyRate - a.replyRate),
+  });
 });
 
 export default router;

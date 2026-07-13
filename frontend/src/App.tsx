@@ -2,9 +2,10 @@ import { useState, type FormEvent } from "react";
 import { searchQuery, findLinkedPerson } from "./api";
 import type { ResearchResponse, CrmPerson } from "./types";
 import QueueView from "./QueueView";
+import AnalyticsView from "./AnalyticsView";
 import "./App.css";
 
-type Tab = "research" | "queue";
+type Tab = "research" | "queue" | "analytics";
 
 function App() {
   const [tab, setTab] = useState<Tab>("research");
@@ -43,7 +44,13 @@ function App() {
     <div className="app">
       <header className="app-header">
         <span className="eyebrow">Sales Intelligence — Research MVP</span>
-        <h1>{tab === "research" ? "Look up a person or company" : "Outreach queue"}</h1>
+        <h1>
+          {tab === "research"
+            ? "Look up a person or company"
+            : tab === "queue"
+              ? "Outreach queue"
+              : "Analytics"}
+        </h1>
         <nav className="tab-row" aria-label="View">
           <button
             className={`tab-button ${tab === "research" ? "active" : ""}`}
@@ -56,6 +63,12 @@ function App() {
             onClick={() => setTab("queue")}
           >
             Queue
+          </button>
+          <button
+            className={`tab-button ${tab === "analytics" ? "active" : ""}`}
+            onClick={() => setTab("analytics")}
+          >
+            Analytics
           </button>
         </nav>
 
@@ -102,8 +115,10 @@ function App() {
             </p>
           )}
         </>
-      ) : (
+      ) : tab === "queue" ? (
         <QueueView />
+      ) : (
+        <AnalyticsView />
       )}
     </div>
   );

@@ -5,6 +5,8 @@ import {
   fetchGoogleStatus,
   getGoogleConnectUrl,
   sendViaGmail,
+  addNote,
+  logMeeting,
   type GoogleStatus,
 } from "./api";
 import type { QueueItem } from "./types";
@@ -18,6 +20,9 @@ export default function QueueView() {
   const [googleStatus, setGoogleStatus] = useState<GoogleStatus | null>(null);
   const [sendingId, setSendingId] = useState<string | null>(null);
   const [sentId, setSentId] = useState<string | null>(null);
+  const [noteDraft, setNoteDraft] = useState<Record<string, string>>({});
+  const [meetingDate, setMeetingDate] = useState<Record<string, string>>({});
+  const [savedNoteId, setSavedNoteId] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -66,6 +71,23 @@ export default function QueueView() {
     } finally {
       setSendingId(null);
     }
+  }
+
+  async function handleAddNote(linkedinUrl: string, personId: string) {
+    const text = (noteDraft[personId] ?? "").trim();
+    if (!text) return;
+    await addNote(linkedinUrl, text);
+    setNoteDraft((current) => ({ ...current, [personId]: "" }));
+    setSavedNoteId(personId);
+    setTimeout(() => setSavedNoteId((current) => (current === personId ? null : current)), 2000);
+  }
+
+  async function handleLogMeeting(linkedinUrl: string, personId: string) {
+    const date = meetingDate[personId];
+    if (!date) return;
+    await logMeeting(linkedinUrl, date);
+    setItems((current) => current.filter((item) => item.person.linkedinUrl !== linkedinUrl));
+    setTotalPending((current) => current - 1);
   }
 
   if (loading) return <p className="empty-state">Generating drafts for everyone pending…</p>;
@@ -143,6 +165,37 @@ export default function QueueView() {
                     onClick={() => handleStatus(person.linkedinUrl, "do_not_contact")}
                   >
                     Do not contact
+                  </button>
+                </div>
+                <div className="queue-extra-row">
+                  <input
+                    type="text"
+                    className="note-input"
+                    placeholder="Add a note…"
+                    value={noteDraft[person.id] ?? ""}
+                    onChange={(e) =>
+                      setNoteDraft((current) => ({ ...current, [person.id]: e.target.value }))
+                    }
+                  />
+                  <button
+                    className="ghost-button"
+                    onClick={() => handleAddNote(person.linkedinUrl, person.id)}
+                  >
+                    {savedNoteId === person.id ? "Saved!" : "Add note"}
+                  </button>
+                  <input
+                    type="date"
+                    className="meeting-input"
+                    value={meetingDate[person.id] ?? ""}
+                    onChange={(e) =>
+                      setMeetingDate((current) => ({ ...current, [person.id]: e.target.value }))
+                    }
+                  />
+                  <button
+                    className="ghost-button"
+                    onClick={() => handleLogMeeting(person.linkedinUrl, person.id)}
+                  >
+                    Log meeting
                   </button>
                 </div>
               </section>
