@@ -1,12 +1,12 @@
 import { JobApplication, AddJobInput, JobStatus } from "../types/jobs";
-import { readJson, writeJson } from "./kvStore";
+import { readJson, writeJson, userScopedKey } from "./kvStore";
 
-async function readAll(): Promise<Record<string, JobApplication>> {
-  return readJson<Record<string, JobApplication>>("jobs", {});
+async function readAll(userId: string): Promise<Record<string, JobApplication>> {
+  return readJson<Record<string, JobApplication>>(userScopedKey("jobs", userId), {});
 }
 
-async function writeAll(data: Record<string, JobApplication>): Promise<void> {
-  await writeJson("jobs", data);
+async function writeAll(userId: string, data: Record<string, JobApplication>): Promise<void> {
+  await writeJson(userScopedKey("jobs", userId), data);
 }
 
 function generateId(company: string, role: string): string {
@@ -14,15 +14,15 @@ function generateId(company: string, role: string): string {
   return `${base}-${Date.now().toString(36)}`;
 }
 
-export async function listJobs(): Promise<JobApplication[]> {
-  const all = await readAll();
+export async function listJobs(userId: string): Promise<JobApplication[]> {
+  const all = await readAll(userId);
   return Object.values(all).sort(
     (a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime()
   );
 }
 
-export async function addJob(input: AddJobInput): Promise<JobApplication> {
-  const all = await readAll();
+export async function addJob(userId: string, input: AddJobInput): Promise<JobApplication> {
+  const all = await readAll(userId);
   const now = new Date().toISOString();
   const id = generateId(input.company, input.role);
 
@@ -40,28 +40,29 @@ export async function addJob(input: AddJobInput): Promise<JobApplication> {
   };
 
   all[id] = job;
-  await writeAll(all);
+  await writeAll(userId, all);
   return job;
 }
 
 export async function updateJob(
+  userId: string,
   id: string,
   patch: Partial<Pick<JobApplication, "status" | "notes" | "appliedDate" | "referralContactName" | "referralContactEmail">>
 ): Promise<JobApplication | undefined> {
-  const all = await readAll();
+  const all = await readAll(userId);
   const existing = all[id];
   if (!existing) return undefined;
 
   all[id] = { ...existing, ...patch, id, updatedAt: new Date().toISOString() };
-  await writeAll(all);
+  await writeAll(userId, all);
   return all[id];
 }
 
-export async function deleteJob(id: string): Promise<boolean> {
-  const all = await readAll();
+export async function deleteJob(userId: string, id: string): Promise<boolean> {
+  const all = await readAll(userId);
   if (!all[id]) return false;
   delete all[id];
-  await writeAll(all);
+  await writeAll(userId, all);
   return true;
 }
 

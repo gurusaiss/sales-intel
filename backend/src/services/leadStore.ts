@@ -1,12 +1,12 @@
 import { Lead, AddLeadsInput, LeadStatus } from "../types/leads";
-import { readJson, writeJson } from "./kvStore";
+import { readJson, writeJson, userScopedKey } from "./kvStore";
 
-async function readAll(): Promise<Record<string, Lead>> {
-  return readJson<Record<string, Lead>>("leads", {});
+async function readAll(userId: string): Promise<Record<string, Lead>> {
+  return readJson<Record<string, Lead>>(userScopedKey("leads", userId), {});
 }
 
-async function writeAll(data: Record<string, Lead>): Promise<void> {
-  await writeJson("leads", data);
+async function writeAll(userId: string, data: Record<string, Lead>): Promise<void> {
+  await writeJson(userScopedKey("leads", userId), data);
 }
 
 function idFor(name: string, email?: string, domain?: string): string {
@@ -14,15 +14,15 @@ function idFor(name: string, email?: string, domain?: string): string {
   return key.trim().replace(/[^a-z0-9@.]+/g, "-");
 }
 
-export async function listLeads(): Promise<Lead[]> {
-  const all = await readAll();
+export async function listLeads(userId: string): Promise<Lead[]> {
+  const all = await readAll(userId);
   return Object.values(all).sort(
     (a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime()
   );
 }
 
-export async function getLead(id: string): Promise<Lead | undefined> {
-  const all = await readAll();
+export async function getLead(userId: string, id: string): Promise<Lead | undefined> {
+  const all = await readAll(userId);
   return all[id];
 }
 
@@ -31,8 +31,8 @@ export async function getLead(id: string): Promise<Lead | undefined> {
  * action (they review the candidate list and pick who to add), never an
  * automatic bulk import of every result.
  */
-export async function addLeads(input: AddLeadsInput): Promise<Lead[]> {
-  const all = await readAll();
+export async function addLeads(userId: string, input: AddLeadsInput): Promise<Lead[]> {
+  const all = await readAll(userId);
   const now = new Date().toISOString();
   const saved: Lead[] = [];
 
@@ -66,28 +66,29 @@ export async function addLeads(input: AddLeadsInput): Promise<Lead[]> {
     saved.push(lead);
   }
 
-  await writeAll(all);
+  await writeAll(userId, all);
   return saved;
 }
 
 export async function updateLead(
+  userId: string,
   id: string,
   patch: Partial<Pick<Lead, "tags" | "notes" | "status" | "priority" | "linkedinUrl" | "phone">>
 ): Promise<Lead | undefined> {
-  const all = await readAll();
+  const all = await readAll(userId);
   const existing = all[id];
   if (!existing) return undefined;
 
   all[id] = { ...existing, ...patch, id, updatedAt: new Date().toISOString() };
-  await writeAll(all);
+  await writeAll(userId, all);
   return all[id];
 }
 
-export async function deleteLead(id: string): Promise<boolean> {
-  const all = await readAll();
+export async function deleteLead(userId: string, id: string): Promise<boolean> {
+  const all = await readAll(userId);
   if (!all[id]) return false;
   delete all[id];
-  await writeAll(all);
+  await writeAll(userId, all);
   return true;
 }
 

@@ -10,26 +10,38 @@ import {
 import { clearTokens } from "../services/googleAuthStore";
 import { getPerson, updatePerson } from "../services/personStore";
 import { requireApiKey } from "../middleware/apiKey";
+import { verifyToken } from "../services/authToken";
+import { DEFAULT_USER_ID } from "../services/kvStore";
 
 const router = Router();
 
-router.get("/auth/google", (_req, res) => {
+/**
+ * Opened as a plain browser navigation (window.open), which can't carry an
+ * Authorization header — so the caller passes their session token as a query
+ * param instead, and it's re-encoded into Google's own "state" param so the
+ * callback below knows which account is connecting.
+ */
+router.get("/auth/google", (req, res) => {
   if (!isConfigured()) {
     return res
       .status(500)
       .send("Google OAuth is not configured. Set GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET, GOOGLE_REDIRECT_URI.");
   }
-  res.redirect(getAuthUrl());
+  const token = typeof req.query.token === "string" ? req.query.token : undefined;
+  const userId = (token && verifyToken(token)) || DEFAULT_USER_ID;
+  res.redirect(getAuthUrl(userId));
 });
 
 router.get("/auth/google/callback", async (req, res) => {
   const code = req.query.code;
+  const state = req.query.state;
   if (typeof code !== "string") {
     return res.status(400).send("Missing authorization code.");
   }
+  const userId = typeof state === "string" && state ? state : DEFAULT_USER_ID;
 
   try {
-    await exchangeCodeForTokens(code);
+    await exchangeCodeForTokens(userId, code);
     res.send(
       "<html><body style='font-family:sans-serif;padding:2rem'><h2>Gmail connected.</h2><p>You can close this tab and go back to the app.</p></body></html>"
     );
@@ -39,12 +51,12 @@ router.get("/auth/google/callback", async (req, res) => {
   }
 });
 
-router.get("/auth/google/status", async (_req, res) => {
-  res.json({ configured: isConfigured(), connected: await isConnected() });
+router.get("/auth/google/status", async (req, res) => {
+  res.json({ configured: isConfigured(), connected: await isConnected(req.userId) });
 });
 
-router.post("/auth/google/disconnect", requireApiKey, async (_req, res) => {
-  await clearTokens();
+router.post("/auth/google/disconnect", requireApiKey, async (req, res) => {
+  await clearTokens(req.userId);
   res.json({ connected: false });
 });
 
@@ -68,12 +80,12 @@ router.post("/send-email", requireApiKey, async (req, res) => {
   }
 
   try {
-    await sendEmail(parsed.data.to, parsed.data.subject, parsed.data.body);
+    await sendEmail(req.userId, parsed.data.to, parsed.data.subject, parsed.data.body);
 
     if (parsed.data.linkedinUrl) {
-      const person = await getPerson(parsed.data.linkedinUrl);
+      const person = await getPerson(req.userId, parsed.data.linkedinUrl);
       if (person) {
-        await updatePerson(parsed.data.linkedinUrl, {
+        await updatePerson(req.userId, parsed.data.linkedinUrl, {
           notes: [
             ...person.notes,
             { text: `Sent email to ${parsed.data.to} via Gmail.`, createdAt: new Date().toISOString() },

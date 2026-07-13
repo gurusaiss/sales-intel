@@ -7,8 +7,8 @@ import { requireApiKey } from "../middleware/apiKey";
 
 const router = Router();
 
-router.get("/resume", requireApiKey, async (_req, res) => {
-  const resume = await getResume();
+router.get("/resume", requireApiKey, async (req, res) => {
+  const resume = await getResume(req.userId);
   res.json({ resume });
 });
 
@@ -19,7 +19,7 @@ router.post("/resume", requireApiKey, async (req, res) => {
   if (!parsed.success) {
     return res.status(400).json({ error: parsed.error.issues[0]?.message ?? "Invalid request" });
   }
-  const resume = await saveResume(parsed.data.text);
+  const resume = await saveResume(req.userId, parsed.data.text);
   res.json({ resume });
 });
 
@@ -31,7 +31,7 @@ router.post("/job-match", requireApiKey, async (req, res) => {
     return res.status(400).json({ error: parsed.error.issues[0]?.message ?? "Invalid request" });
   }
 
-  const resume = await getResume();
+  const resume = await getResume(req.userId);
   if (!resume) {
     return res.status(400).json({ error: "Save your resume first." });
   }
@@ -57,7 +57,7 @@ router.post("/cover-letter", requireApiKey, async (req, res) => {
     return res.status(400).json({ error: parsed.error.issues[0]?.message ?? "Invalid request" });
   }
 
-  const resume = await getResume();
+  const resume = await getResume(req.userId);
   if (!resume) {
     return res.status(400).json({ error: "Save your resume first." });
   }
@@ -76,8 +76,8 @@ router.post("/cover-letter", requireApiKey, async (req, res) => {
   }
 });
 
-router.get("/jobs", requireApiKey, async (_req, res) => {
-  const jobs = await listJobs();
+router.get("/jobs", requireApiKey, async (req, res) => {
+  const jobs = await listJobs(req.userId);
   res.json({ jobs });
 });
 
@@ -94,7 +94,7 @@ router.post("/jobs", requireApiKey, async (req, res) => {
   if (!parsed.success) {
     return res.status(400).json({ error: parsed.error.issues[0]?.message ?? "Invalid request" });
   }
-  const job = await addJob(parsed.data);
+  const job = await addJob(req.userId, parsed.data);
   res.json({ job });
 });
 
@@ -111,13 +111,13 @@ router.patch("/jobs/:id", requireApiKey, async (req, res) => {
   if (!parsed.success) {
     return res.status(400).json({ error: parsed.error.issues[0]?.message ?? "Invalid request" });
   }
-  const job = await updateJob(req.params.id, parsed.data as never);
+  const job = await updateJob(req.userId, req.params.id, parsed.data as never);
   if (!job) return res.status(404).json({ error: "Job not found" });
   res.json({ job });
 });
 
 router.delete("/jobs/:id", requireApiKey, async (req, res) => {
-  const deleted = await deleteJob(req.params.id);
+  const deleted = await deleteJob(req.userId, req.params.id);
   if (!deleted) return res.status(404).json({ error: "Job not found" });
   res.json({ deleted: true });
 });

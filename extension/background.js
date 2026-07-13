@@ -4,36 +4,45 @@
 
 importScripts("config.js");
 
-function authHeaders(extra) {
+function getSessionToken() {
+  return new Promise((resolve) => {
+    chrome.storage.local.get(["sessionToken"], (result) => resolve(result.sessionToken || null));
+  });
+}
+
+async function authHeaders(extra) {
+  const token = await getSessionToken();
   return {
     ...(API_KEY ? { "x-api-key": API_KEY } : {}),
+    ...(token ? { authorization: `Bearer ${token}` } : {}),
     ...extra,
   };
 }
 
-function forwardResponse(promise, sendResponse) {
-  promise
-    .then(async (res) => {
-      const body = await res.json().catch(() => ({}));
-      if (!res.ok) {
-        sendResponse({ ok: false, error: body.error || `Request failed (${res.status})` });
-        return;
-      }
-      sendResponse({ ok: true, data: body });
-    })
-    .catch((err) => {
-      sendResponse({ ok: false, error: err.message || "Network error reaching backend" });
-    });
+async function forwardRequest(url, options, sendResponse) {
+  try {
+    const headers = await authHeaders(options.headers);
+    const res = await fetch(url, { ...options, headers });
+    const body = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      sendResponse({ ok: false, error: body.error || `Request failed (${res.status})` });
+      return;
+    }
+    sendResponse({ ok: true, data: body });
+  } catch (err) {
+    sendResponse({ ok: false, error: err.message || "Network error reaching backend" });
+  }
 }
 
 chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
   if (message.type === "GENERATE_DRAFT") {
-    forwardResponse(
-      fetch(`${API_BASE}/api/draft`, {
+    forwardRequest(
+      `${API_BASE}/api/draft`,
+      {
         method: "POST",
-        headers: authHeaders({ "content-type": "application/json" }),
+        headers: { "content-type": "application/json" },
         body: JSON.stringify(message.payload),
-      }),
+      },
       sendResponse
     );
     return true; // keep the message channel open for the async response
@@ -41,39 +50,42 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
 
   if (message.type === "ESCALATE") {
     const encodedUrl = encodeURIComponent(message.linkedinUrl);
-    forwardResponse(
-      fetch(`${API_BASE}/api/persons/${encodedUrl}/escalate`, {
+    forwardRequest(
+      `${API_BASE}/api/persons/${encodedUrl}/escalate`,
+      {
         method: "POST",
-        headers: authHeaders({ "content-type": "application/json" }),
+        headers: { "content-type": "application/json" },
         body: JSON.stringify({ domain: message.domain }),
-      }),
+      },
       sendResponse
     );
     return true;
   }
 
   if (message.type === "MERGE_PERSONS") {
-    forwardResponse(
-      fetch(`${API_BASE}/api/persons/merge`, {
+    forwardRequest(
+      `${API_BASE}/api/persons/merge`,
+      {
         method: "POST",
-        headers: authHeaders({ "content-type": "application/json" }),
+        headers: { "content-type": "application/json" },
         body: JSON.stringify({
           keepLinkedinUrl: message.keepLinkedinUrl,
           mergeLinkedinUrl: message.mergeLinkedinUrl,
         }),
-      }),
+      },
       sendResponse
     );
     return true;
   }
 
   if (message.type === "CAPTURE_PROFILE") {
-    forwardResponse(
-      fetch(`${API_BASE}/api/persons/capture`, {
+    forwardRequest(
+      `${API_BASE}/api/persons/capture`,
+      {
         method: "POST",
-        headers: authHeaders({ "content-type": "application/json" }),
+        headers: { "content-type": "application/json" },
         body: JSON.stringify(message.payload),
-      }),
+      },
       sendResponse
     );
     return true;
@@ -81,12 +93,13 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
 
   if (message.type === "PATCH_PERSON") {
     const encodedUrl = encodeURIComponent(message.linkedinUrl);
-    forwardResponse(
-      fetch(`${API_BASE}/api/persons/${encodedUrl}`, {
+    forwardRequest(
+      `${API_BASE}/api/persons/${encodedUrl}`,
+      {
         method: "PATCH",
-        headers: authHeaders({ "content-type": "application/json" }),
+        headers: { "content-type": "application/json" },
         body: JSON.stringify(message.patch),
-      }),
+      },
       sendResponse
     );
     return true;

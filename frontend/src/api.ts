@@ -2,10 +2,22 @@ import type { ResearchResponse, QueueResponse, ContactStatus, CrmPerson } from "
 
 const API_BASE = import.meta.env.VITE_API_BASE ?? "http://localhost:4000";
 const API_KEY = import.meta.env.VITE_APP_API_KEY;
+const SESSION_TOKEN_STORAGE_KEY = "sessionToken";
+
+export function getSessionToken(): string | null {
+  return localStorage.getItem(SESSION_TOKEN_STORAGE_KEY);
+}
+
+export function setSessionToken(token: string | null): void {
+  if (token) localStorage.setItem(SESSION_TOKEN_STORAGE_KEY, token);
+  else localStorage.removeItem(SESSION_TOKEN_STORAGE_KEY);
+}
 
 function authHeaders(extra?: Record<string, string>): Record<string, string> {
+  const token = getSessionToken();
   return {
     ...(API_KEY ? { "x-api-key": API_KEY } : {}),
+    ...(token ? { authorization: `Bearer ${token}` } : {}),
     ...extra,
   };
 }
@@ -50,12 +62,56 @@ export interface GoogleStatus {
 }
 
 export async function fetchGoogleStatus(): Promise<GoogleStatus> {
-  const res = await fetch(`${API_BASE}/api/auth/google/status`);
+  const res = await fetch(`${API_BASE}/api/auth/google/status`, { headers: authHeaders() });
   return handleResponse(res);
 }
 
+/**
+ * This link is opened as a plain browser navigation (target="_blank"), which
+ * can't carry an Authorization header — so the session token rides along as
+ * a query param instead, and the backend re-encodes it into Google's own
+ * "state" param so the OAuth callback knows which account is connecting.
+ */
 export function getGoogleConnectUrl(): string {
-  return `${API_BASE}/api/auth/google`;
+  const token = getSessionToken();
+  return `${API_BASE}/api/auth/google${token ? `?token=${encodeURIComponent(token)}` : ""}`;
+}
+
+export interface AuthUser {
+  id: string;
+  email: string;
+  createdAt: string;
+}
+
+export async function signupUser(email: string, password: string): Promise<AuthUser> {
+  const res = await fetch(`${API_BASE}/api/auth/signup`, {
+    method: "POST",
+    headers: authHeaders({ "content-type": "application/json" }),
+    body: JSON.stringify({ email, password }),
+  });
+  const data = await handleResponse<{ user: AuthUser; token: string }>(res);
+  setSessionToken(data.token);
+  return data.user;
+}
+
+export async function loginUser(email: string, password: string): Promise<AuthUser> {
+  const res = await fetch(`${API_BASE}/api/auth/login`, {
+    method: "POST",
+    headers: authHeaders({ "content-type": "application/json" }),
+    body: JSON.stringify({ email, password }),
+  });
+  const data = await handleResponse<{ user: AuthUser; token: string }>(res);
+  setSessionToken(data.token);
+  return data.user;
+}
+
+export function logoutUser(): void {
+  setSessionToken(null);
+}
+
+export async function fetchCurrentUser(): Promise<{ userId: string; loggedIn: boolean }> {
+  const res = await fetch(`${API_BASE}/api/auth/me`, { headers: authHeaders() });
+  return handleResponse(res);
 }
 
 export async function findLinkedPerson(params: {

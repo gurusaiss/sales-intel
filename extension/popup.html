@@ -10,6 +10,24 @@
       <h1>Tracked people</h1>
       <p class="sub">Open a LinkedIn conversation and click "Draft follow-up" to add someone here.</p>
     </header>
+
+    <section id="auth-section">
+      <div id="auth-logged-out" hidden>
+        <p class="sub">Not logged in — using shared data. Log in for your own private account.</p>
+        <input id="auth-email" type="email" placeholder="Email" />
+        <input id="auth-password" type="password" placeholder="Password" minlength="6" />
+        <div class="auth-buttons">
+          <button id="auth-login">Log in</button>
+          <button id="auth-signup">Sign up</button>
+        </div>
+        <span id="auth-status"></span>
+      </div>
+      <div id="auth-logged-in" hidden>
+        <p class="sub">Logged in — this data is private to your account.</p>
+        <button id="auth-logout">Log out</button>
+      </div>
+    </section>
+
     <div id="nudge"></div>
     <div class="export-row">
       <button id="export-csv">Export CSV</button>

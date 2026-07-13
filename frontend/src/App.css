@@ -553,3 +553,34 @@ h1 {
   border-bottom: 1px solid var(--accent);
   padding-bottom: 0.3rem;
 }
+
+.auth-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  padding: 0.5rem 0;
+}
+
+.auth-form {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+.auth-form input {
+  padding: 0.4rem 0.6rem;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--card);
+  color: var(--ink);
+  font-size: 0.82rem;
+}
+
+.auth-form .error-banner {
+  flex-basis: 100%;
+  font-size: 0.78rem;
+  padding: 0.4rem 0.6rem;
+}

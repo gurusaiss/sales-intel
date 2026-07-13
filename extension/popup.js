@@ -3,13 +3,33 @@
 // user notices next time they check, instead of needing to remember to look.
 const REPLY_NUDGE_WINDOW_MS = 3 * 24 * 60 * 60 * 1000; // 3 days
 
+function getSessionToken() {
+  return new Promise((resolve) => {
+    chrome.storage.local.get(["sessionToken"], (result) => resolve(result.sessionToken || null));
+  });
+}
+
+function setSessionToken(token) {
+  return new Promise((resolve) => {
+    if (token) chrome.storage.local.set({ sessionToken: token }, resolve);
+    else chrome.storage.local.remove("sessionToken", resolve);
+  });
+}
+
+async function authHeaders(extra) {
+  const token = await getSessionToken();
+  return {
+    ...(API_KEY ? { "x-api-key": API_KEY } : {}),
+    ...(token ? { authorization: `Bearer ${token}` } : {}),
+    ...extra,
+  };
+}
+
 async function loadPersons() {
   const nudgeEl = document.getElementById("nudge");
   const listEl = document.getElementById("list");
   try {
-    const res = await fetch(`${API_BASE}/api/persons`, {
-      headers: API_KEY ? { "x-api-key": API_KEY } : {},
-    });
+    const res = await fetch(`${API_BASE}/api/persons`, { headers: await authHeaders() });
     const { persons } = await res.json();
 
     renderNudge(nudgeEl, persons);
@@ -79,7 +99,7 @@ function saveBookingProfile() {
 async function exportPersons(format) {
   try {
     const res = await fetch(`${API_BASE}/api/persons/export?format=${format}`, {
-      headers: API_KEY ? { "x-api-key": API_KEY } : {},
+      headers: await authHeaders(),
     });
     if (!res.ok) throw new Error(`Export failed (${res.status})`);
     const blob = await res.blob();
@@ -96,8 +116,71 @@ async function exportPersons(format) {
   }
 }
 
+/**
+ * Same account as the web app — signup/login hit the identical backend
+ * endpoints, and the resulting session token is stored in
+ * chrome.storage.local, which survives extension/browser/computer restarts
+ * (unlike in-memory state), satisfying the "no data loss on restart"
+ * requirement for the login session itself.
+ */
+async function refreshAuthUI() {
+  const loggedOutEl = document.getElementById("auth-logged-out");
+  const loggedInEl = document.getElementById("auth-logged-in");
+  try {
+    const res = await fetch(`${API_BASE}/api/auth/me`, { headers: await authHeaders() });
+    const data = await res.json();
+    loggedOutEl.hidden = data.loggedIn;
+    loggedInEl.hidden = !data.loggedIn;
+  } catch {
+    loggedOutEl.hidden = false;
+    loggedInEl.hidden = true;
+  }
+}
+
+async function handleAuthSubmit(endpoint) {
+  const statusEl = document.getElementById("auth-status");
+  const email = document.getElementById("auth-email").value.trim();
+  const password = document.getElementById("auth-password").value;
+
+  if (!email || password.length < 6) {
+    statusEl.textContent = "Enter a valid email and a password of 6+ characters.";
+    return;
+  }
+
+  statusEl.textContent = "…";
+  try {
+    const res = await fetch(`${API_BASE}/api/${endpoint}`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ email, password }),
+    });
+    const data = await res.json();
+    if (!res.ok) {
+      statusEl.textContent = data.error || "Failed.";
+      return;
+    }
+    await setSessionToken(data.token);
+    statusEl.textContent = "";
+    await refreshAuthUI();
+    await loadPersons();
+  } catch (err) {
+    statusEl.textContent = err.message || "Network error.";
+  }
+}
+
+async function handleLogout() {
+  await setSessionToken(null);
+  await refreshAuthUI();
+  await loadPersons();
+}
+
 document.getElementById("export-csv").addEventListener("click", () => exportPersons("csv"));
 document.getElementById("export-json").addEventListener("click", () => exportPersons("json"));
 document.getElementById("booking-save").addEventListener("click", saveBookingProfile);
+document.getElementById("auth-login").addEventListener("click", () => handleAuthSubmit("auth/login"));
+document.getElementById("auth-signup").addEventListener("click", () => handleAuthSubmit("auth/signup"));
+document.getElementById("auth-logout").addEventListener("click", handleLogout);
+
 loadBookingProfile();
+refreshAuthUI();
 loadPersons();

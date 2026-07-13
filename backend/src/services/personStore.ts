@@ -1,13 +1,13 @@
 import { CrmPerson, CapturePersonInput } from "../types/crm";
 import { matchTemplateCategory } from "./templates";
-import { readJson, writeJson } from "./kvStore";
+import { readJson, writeJson, userScopedKey } from "./kvStore";
 
-async function readAll(): Promise<Record<string, CrmPerson>> {
-  return readJson<Record<string, CrmPerson>>("persons", {});
+async function readAll(userId: string): Promise<Record<string, CrmPerson>> {
+  return readJson<Record<string, CrmPerson>>(userScopedKey("persons", userId), {});
 }
 
-async function writeAll(data: Record<string, CrmPerson>): Promise<void> {
-  await writeJson("persons", data);
+async function writeAll(userId: string, data: Record<string, CrmPerson>): Promise<void> {
+  await writeJson(userScopedKey("persons", userId), data);
 }
 
 export function idFromUrl(linkedinUrl: string): string {
@@ -18,15 +18,15 @@ export function idFromUrl(linkedinUrl: string): string {
     .replace(/\/$/, "");
 }
 
-export async function listPersons(): Promise<CrmPerson[]> {
-  const all = await readAll();
+export async function listPersons(userId: string): Promise<CrmPerson[]> {
+  const all = await readAll(userId);
   return Object.values(all).sort(
     (a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime()
   );
 }
 
-export async function getPerson(linkedinUrl: string): Promise<CrmPerson | undefined> {
-  const all = await readAll();
+export async function getPerson(userId: string, linkedinUrl: string): Promise<CrmPerson | undefined> {
+  const all = await readAll(userId);
   return all[idFromUrl(linkedinUrl)];
 }
 
@@ -36,12 +36,11 @@ export async function getPerson(linkedinUrl: string): Promise<CrmPerson | undefi
  * "you're already tracking this person" instead of treating every channel
  * as a separate, disconnected contact.
  */
-export async function findPersonByIdentity(params: {
-  email?: string;
-  domain?: string;
-  name?: string;
-}): Promise<CrmPerson | undefined> {
-  const all = await listPersons();
+export async function findPersonByIdentity(
+  userId: string,
+  params: { email?: string; domain?: string; name?: string }
+): Promise<CrmPerson | undefined> {
+  const all = await listPersons(userId);
   const emailLower = params.email?.toLowerCase();
   const domainLower = params.domain?.toLowerCase();
   const nameLower = params.name?.trim().toLowerCase();
@@ -60,10 +59,11 @@ export async function findPersonByIdentity(params: {
  * different formatting, silently splitting one person into two records.
  */
 export async function findDuplicatesByName(
+  userId: string,
   name: string,
   excludeId: string
 ): Promise<CrmPerson[]> {
-  const all = await listPersons();
+  const all = await listPersons(userId);
   const nameLower = name.trim().toLowerCase();
   return all.filter((p) => p.id !== excludeId && p.name.trim().toLowerCase() === nameLower);
 }
@@ -76,10 +76,11 @@ export async function findDuplicatesByName(
  * name match alone isn't proof two records are actually the same person.
  */
 export async function mergePersons(
+  userId: string,
   keepLinkedinUrl: string,
   mergeLinkedinUrl: string
 ): Promise<CrmPerson | undefined> {
-  const all = await readAll();
+  const all = await readAll(userId);
   const keepId = idFromUrl(keepLinkedinUrl);
   const mergeId = idFromUrl(mergeLinkedinUrl);
 
@@ -118,7 +119,7 @@ export async function mergePersons(
 
   delete all[mergeId];
   all[keepId] = merged;
-  await writeAll(all);
+  await writeAll(userId, all);
   return merged;
 }
 
@@ -133,8 +134,11 @@ function laterOf(a?: string, b?: string): string | undefined {
  * This is the only write path for LinkedIn-derived data — always triggered by
  * an explicit user action, never a background process.
  */
-export async function captureOrUpdatePerson(input: CapturePersonInput): Promise<CrmPerson> {
-  const all = await readAll();
+export async function captureOrUpdatePerson(
+  userId: string,
+  input: CapturePersonInput
+): Promise<CrmPerson> {
+  const all = await readAll(userId);
   const id = idFromUrl(input.linkedinUrl);
   const now = new Date().toISOString();
   const existing = all[id];
@@ -191,20 +195,21 @@ export async function captureOrUpdatePerson(input: CapturePersonInput): Promise<
   }
 
   all[id] = person;
-  await writeAll(all);
+  await writeAll(userId, all);
   return person;
 }
 
 export async function updatePerson(
+  userId: string,
   linkedinUrl: string,
   patch: Partial<CrmPerson>
 ): Promise<CrmPerson | undefined> {
-  const all = await readAll();
+  const all = await readAll(userId);
   const id = idFromUrl(linkedinUrl);
   const existing = all[id];
   if (!existing) return undefined;
 
   all[id] = { ...existing, ...patch, id, updatedAt: new Date().toISOString() };
-  await writeAll(all);
+  await writeAll(userId, all);
   return all[id];
 }

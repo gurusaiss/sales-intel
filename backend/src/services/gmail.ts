@@ -10,7 +10,12 @@ export function isConfigured(): boolean {
   return Boolean(CLIENT_ID && CLIENT_SECRET && REDIRECT_URI);
 }
 
-export function getAuthUrl(): string {
+/**
+ * userId travels through Google's own "state" parameter — the only way to
+ * know which account is connecting once Google redirects back to our
+ * callback, since that request carries no session of its own.
+ */
+export function getAuthUrl(userId: string): string {
   const params = new URLSearchParams({
     client_id: CLIENT_ID!,
     redirect_uri: REDIRECT_URI!,
@@ -18,11 +23,12 @@ export function getAuthUrl(): string {
     scope: SCOPE,
     access_type: "offline",
     prompt: "consent",
+    state: userId,
   });
   return `https://accounts.google.com/o/oauth2/v2/auth?${params.toString()}`;
 }
 
-export async function exchangeCodeForTokens(code: string): Promise<void> {
+export async function exchangeCodeForTokens(userId: string, code: string): Promise<void> {
   const res = await fetch("https://oauth2.googleapis.com/token", {
     method: "POST",
     headers: { "content-type": "application/x-www-form-urlencoded" },
@@ -54,20 +60,20 @@ export async function exchangeCodeForTokens(code: string): Promise<void> {
     );
   }
 
-  await writeTokens({
+  await writeTokens(userId, {
     refreshToken: data.refresh_token,
     accessToken: data.access_token,
     expiresAt: Date.now() + (data.expires_in - 60) * 1000,
   });
 }
 
-export async function isConnected(): Promise<boolean> {
-  const tokens = await readTokens();
+export async function isConnected(userId: string): Promise<boolean> {
+  const tokens = await readTokens(userId);
   return Boolean(tokens?.refreshToken);
 }
 
-async function getValidAccessToken(): Promise<string> {
-  const tokens = await readTokens();
+async function getValidAccessToken(userId: string): Promise<string> {
+  const tokens = await readTokens(userId);
   if (!tokens) {
     throw new Error("Gmail not connected. Connect your Google account first.");
   }
@@ -92,7 +98,7 @@ async function getValidAccessToken(): Promise<string> {
   }
 
   const data = (await res.json()) as { access_token: string; expires_in: number };
-  await writeTokens({
+  await writeTokens(userId, {
     refreshToken: tokens.refreshToken,
     accessToken: data.access_token,
     expiresAt: Date.now() + (data.expires_in - 60) * 1000,
@@ -101,8 +107,8 @@ async function getValidAccessToken(): Promise<string> {
   return data.access_token;
 }
 
-export async function sendEmail(to: string, subject: string, body: string): Promise<void> {
-  const accessToken = await getValidAccessToken();
+export async function sendEmail(userId: string, to: string, subject: string, body: string): Promise<void> {
+  const accessToken = await getValidAccessToken(userId);
   const raw = buildRawMessage(to, subject, body);
 
   const res = await fetch("https://gmail.googleapis.com/gmail/v1/users/me/messages/send", {

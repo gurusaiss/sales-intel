@@ -5,6 +5,7 @@ import QueueView from "./QueueView";
 import AnalyticsView from "./AnalyticsView";
 import CompanySearchView from "./CompanySearchView";
 import CareerView from "./CareerView";
+import AuthBar from "./AuthBar";
 import "./App.css";
 
 type Tab = "research" | "companies" | "queue" | "analytics" | "career";
@@ -46,6 +47,7 @@ function App() {
     <div className="app">
       <header className="app-header">
         <span className="eyebrow">Sales Intelligence — Research MVP</span>
+        <AuthBar />
         <h1>
           {tab === "research"
             ? "Look up a person or company"

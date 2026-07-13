@@ -62,8 +62,18 @@ export async function writeJson<T>(key: string, value: T): Promise<void> {
   await writeLocalFile(key, value);
 }
 
+// Windows treats ":" in a filename as the NTFS Alternate Data Stream
+// separator, not a literal character — "persons:abc123" silently becomes a
+// stream on a file named "persons" instead of its own file. Per-user keys
+// (userScopedKey) use ":" as their separator, so local-file mode must not
+// pass that through raw. This only affects the local fs fallback — Upstash
+// Redis keys allow colons natively — but it's a real cross-platform bug.
+function safeFilename(key: string): string {
+  return key.replace(/[:<>"|?*]/g, "__");
+}
+
 async function readLocalFile<T>(key: string, fallback: T): Promise<T> {
-  const file = path.join(DATA_DIR, `${key}.json`);
+  const file = path.join(DATA_DIR, `${safeFilename(key)}.json`);
   try {
     const raw = await fs.readFile(file, "utf-8");
     return JSON.parse(raw) as T;
@@ -74,10 +84,23 @@ async function readLocalFile<T>(key: string, fallback: T): Promise<T> {
 
 async function writeLocalFile<T>(key: string, value: T): Promise<void> {
   await fs.mkdir(DATA_DIR, { recursive: true });
-  const file = path.join(DATA_DIR, `${key}.json`);
+  const file = path.join(DATA_DIR, `${safeFilename(key)}.json`);
   await fs.writeFile(file, JSON.stringify(value, null, 2), "utf-8");
 }
 
 export function isDurablePersistenceConfigured(): boolean {
   return Boolean(UPSTASH_URL && UPSTASH_TOKEN);
+}
+
+export const DEFAULT_USER_ID = "default";
+
+/**
+ * Every store's key is scoped by user so logged-in accounts get fully
+ * isolated data. "default" (the namespace used when nobody's logged in)
+ * maps to the exact same key every store already used before accounts
+ * existed — so using the app without logging in keeps working unchanged,
+ * and nothing needs migrating for existing data.
+ */
+export function userScopedKey(base: string, userId: string): string {
+  return userId === DEFAULT_USER_ID ? base : `${base}:${userId}`;
 }

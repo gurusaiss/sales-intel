@@ -1,4 +1,4 @@
-import { readJson, writeJson } from "./kvStore";
+import { readJson, writeJson, userScopedKey } from "./kvStore";
 
 interface GoogleTokens {
   refreshToken: string;
@@ -6,15 +6,15 @@ interface GoogleTokens {
   expiresAt?: number; // epoch ms
 }
 
-export async function readTokens(): Promise<GoogleTokens | null> {
-  const tokens = await readJson<GoogleTokens | null>("googleAuth", null);
+export async function readTokens(userId: string): Promise<GoogleTokens | null> {
+  const tokens = await readJson<GoogleTokens | null>(userScopedKey("googleAuth", userId), null);
   return tokens?.refreshToken ? tokens : null;
 }
 
-export async function writeTokens(tokens: GoogleTokens): Promise<void> {
-  await writeJson("googleAuth", tokens);
+export async function writeTokens(userId: string, tokens: GoogleTokens): Promise<void> {
+  await writeJson(userScopedKey("googleAuth", userId), tokens);
 }
 
-export async function clearTokens(): Promise<void> {
-  await writeJson("googleAuth", {});
+export async function clearTokens(userId: string): Promise<void> {
+  await writeJson(userScopedKey("googleAuth", userId), {});
 }

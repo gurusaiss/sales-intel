@@ -49,8 +49,8 @@ const captureSchema = z.object({
   visibleMessage: visibleMessageSchema.optional(),
 });
 
-router.get("/persons", requireApiKey, async (_req, res) => {
-  const persons = await listPersons();
+router.get("/persons", requireApiKey, async (req, res) => {
+  const persons = await listPersons(req.userId);
   res.json({ persons });
 });
 
@@ -62,7 +62,7 @@ router.get("/persons", requireApiKey, async (_req, res) => {
  */
 router.get("/persons/lookup", requireApiKey, async (req, res) => {
   const { email, domain, name } = req.query;
-  const match = await findPersonByIdentity({
+  const match = await findPersonByIdentity(req.userId, {
     email: typeof email === "string" ? email : undefined,
     domain: typeof domain === "string" ? domain : undefined,
     name: typeof name === "string" ? name : undefined,
@@ -76,7 +76,7 @@ router.get("/persons/lookup", requireApiKey, async (req, res) => {
  */
 router.get("/persons/export", requireApiKey, async (req, res) => {
   const format = (req.query.format as string) || "csv";
-  const persons = await listPersons();
+  const persons = await listPersons(req.userId);
 
   if (format === "json") {
     res.setHeader("Content-Disposition", "attachment; filename=linkedin-contacts.json");
@@ -125,7 +125,7 @@ function csvEscape(value: string): string {
 }
 
 router.get("/persons/:linkedinUrl", requireApiKey, async (req, res) => {
-  const person = await getPerson(decodeURIComponent(req.params.linkedinUrl));
+  const person = await getPerson(req.userId, decodeURIComponent(req.params.linkedinUrl));
   if (!person) return res.status(404).json({ error: "Person not found" });
   res.json({ person });
 });
@@ -137,7 +137,7 @@ router.post("/persons/capture", requireApiKey, async (req, res) => {
   }
 
   try {
-    const person = await captureOrUpdatePerson(parsed.data);
+    const person = await captureOrUpdatePerson(req.userId, parsed.data);
     res.json({ person });
   } catch (err) {
     console.error("Capture failed", err);
@@ -163,7 +163,7 @@ router.patch("/persons/:linkedinUrl", requireApiKey, async (req, res) => {
     return res.status(400).json({ error: parsed.error.issues[0]?.message ?? "Invalid request" });
   }
 
-  const person = await updatePerson(decodeURIComponent(req.params.linkedinUrl), parsed.data);
+  const person = await updatePerson(req.userId, decodeURIComponent(req.params.linkedinUrl), parsed.data);
   if (!person) return res.status(404).json({ error: "Person not found" });
   res.json({ person });
 });
@@ -179,10 +179,10 @@ router.post("/persons/:linkedinUrl/notes", requireApiKey, async (req, res) => {
   }
 
   const linkedinUrl = decodeURIComponent(req.params.linkedinUrl);
-  const person = await getPerson(linkedinUrl);
+  const person = await getPerson(req.userId, linkedinUrl);
   if (!person) return res.status(404).json({ error: "Person not found" });
 
-  const updated = await updatePerson(linkedinUrl, {
+  const updated = await updatePerson(req.userId, linkedinUrl, {
     notes: [...person.notes, { text: parsed.data.text, createdAt: new Date().toISOString() }],
   });
   res.json({ person: updated });
@@ -201,10 +201,10 @@ router.post("/persons/:linkedinUrl/meetings", requireApiKey, async (req, res) =>
   }
 
   const linkedinUrl = decodeURIComponent(req.params.linkedinUrl);
-  const person = await getPerson(linkedinUrl);
+  const person = await getPerson(req.userId, linkedinUrl);
   if (!person) return res.status(404).json({ error: "Person not found" });
 
-  const updated = await updatePerson(linkedinUrl, {
+  const updated = await updatePerson(req.userId, linkedinUrl, {
     meetings: [...person.meetings, parsed.data],
     status: "booked",
   });
@@ -225,7 +225,7 @@ router.post("/draft", requireApiKey, async (req, res) => {
 
   try {
     const { templateOverride, ...captureInput } = parsed.data;
-    const person = await captureOrUpdatePerson(captureInput);
+    const person = await captureOrUpdatePerson(req.userId, captureInput);
 
     if (person.status === "do_not_contact") {
       return res
@@ -235,17 +235,17 @@ router.post("/draft", requireApiKey, async (req, res) => {
 
     if (templateOverride) {
       person.templateCategory = templateOverride;
-      await updatePerson(person.linkedinUrl, { templateCategory: templateOverride });
+      await updatePerson(req.userId, person.linkedinUrl, { templateCategory: templateOverride });
     } else if (person.templateCategory === "unclassified" && person.role) {
       const matched = matchTemplateCategory(person.role);
       if (matched !== "unclassified") {
         person.templateCategory = matched;
-        await updatePerson(person.linkedinUrl, { templateCategory: matched });
+        await updatePerson(req.userId, person.linkedinUrl, { templateCategory: matched });
       }
     }
 
     const draft = await generateFollowUpDraft(person);
-    const possibleDuplicates = await findDuplicatesByName(person.name, person.id);
+    const possibleDuplicates = await findDuplicatesByName(req.userId, person.name, person.id);
 
     res.json({
       person,
@@ -281,7 +281,7 @@ router.post("/persons/merge", requireApiKey, async (req, res) => {
     return res.status(400).json({ error: parsed.error.issues[0]?.message ?? "Invalid request" });
   }
 
-  const merged = await mergePersons(parsed.data.keepLinkedinUrl, parsed.data.mergeLinkedinUrl);
+  const merged = await mergePersons(req.userId, parsed.data.keepLinkedinUrl, parsed.data.mergeLinkedinUrl);
   if (!merged) {
     return res.status(404).json({ error: "One or both persons not found, or same person given twice." });
   }
@@ -306,7 +306,7 @@ router.post("/persons/:linkedinUrl/escalate", requireApiKey, async (req, res) =>
   }
 
   const linkedinUrl = decodeURIComponent(req.params.linkedinUrl);
-  const person = await getPerson(linkedinUrl);
+  const person = await getPerson(req.userId, linkedinUrl);
   if (!person) return res.status(404).json({ error: "Person not found" });
   if (person.status === "do_not_contact") {
     return res.status(409).json({ error: "This person is marked do_not_contact." });
@@ -333,7 +333,7 @@ router.post("/persons/:linkedinUrl/escalate", requireApiKey, async (req, res) =>
     const contactPageUrl = scan.contactPageUrl ?? person.contactPageUrl;
     const bookingUrl = scan.bookingUrl ?? person.bookingUrl;
 
-    const updated = await updatePerson(linkedinUrl, {
+    const updated = await updatePerson(req.userId, linkedinUrl, {
       companyDomain: domain,
       publicEmail,
       emailConfidence,
@@ -370,7 +370,7 @@ router.get("/queue", requireApiKey, async (req, res) => {
   const limit = Math.min(Math.max(Number.isFinite(requested) && requested > 0 ? requested : 15, 1), 30);
 
   try {
-    const all = await listPersons();
+    const all = await listPersons(req.userId);
     const pending = all
       .filter((p) => p.status === "no_reply")
       .sort((a, b) => {
@@ -397,8 +397,8 @@ router.get("/queue", requireApiKey, async (req, res) => {
  * surface that generic CRMs don't — which template category actually gets
  * replies, computed from data already captured, no new integration needed.
  */
-router.get("/analytics", requireApiKey, async (_req, res) => {
-  const all = await listPersons();
+router.get("/analytics", requireApiKey, async (req, res) => {
+  const all = await listPersons(req.userId);
 
   const byTemplate: Record<
     string,

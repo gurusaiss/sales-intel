@@ -78,7 +78,7 @@ router.post("/leads", requireApiKey, async (req, res) => {
   }
 
   try {
-    const leads = await addLeads(parsed.data);
+    const leads = await addLeads(req.userId, parsed.data);
     res.json({ leads });
   } catch (err) {
     console.error("Adding leads failed", err);
@@ -86,8 +86,8 @@ router.post("/leads", requireApiKey, async (req, res) => {
   }
 });
 
-router.get("/leads", requireApiKey, async (_req, res) => {
-  const leads = await listLeads();
+router.get("/leads", requireApiKey, async (req, res) => {
+  const leads = await listLeads(req.userId);
   res.json({ leads });
 });
 
@@ -106,20 +106,20 @@ router.patch("/leads/:id", requireApiKey, async (req, res) => {
     return res.status(400).json({ error: parsed.error.issues[0]?.message ?? "Invalid request" });
   }
 
-  const lead = await updateLead(req.params.id, parsed.data as never);
+  const lead = await updateLead(req.userId, req.params.id, parsed.data as never);
   if (!lead) return res.status(404).json({ error: "Lead not found" });
   res.json({ lead });
 });
 
 router.delete("/leads/:id", requireApiKey, async (req, res) => {
-  const deleted = await deleteLead(req.params.id);
+  const deleted = await deleteLead(req.userId, req.params.id);
   if (!deleted) return res.status(404).json({ error: "Lead not found" });
   res.json({ deleted: true });
 });
 
 router.get("/leads/export", requireApiKey, async (req, res) => {
   const format = (req.query.format as string) || "csv";
-  const leads = await listLeads();
+  const leads = await listLeads(req.userId);
 
   if (format === "json") {
     res.setHeader("Content-Disposition", "attachment; filename=leads.json");

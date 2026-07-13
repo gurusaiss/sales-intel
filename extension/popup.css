@@ -75,6 +75,47 @@ h1 {
   font-size: 0.8rem;
 }
 
+#auth-section {
+  padding: 0 1rem 0.6rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+
+#auth-section input {
+  font-size: 0.82rem;
+  padding: 0.35rem 0.5rem;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--card);
+  color: var(--ink);
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.auth-buttons {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.auth-buttons button,
+#auth-logout {
+  flex: 1;
+  background: var(--accent);
+  color: #fff;
+  border: none;
+  border-radius: 6px;
+  padding: 0.4rem 0.6rem;
+  font-size: 0.78rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+#auth-status {
+  font-size: 0.72rem;
+  color: #c0392b;
+}
+
 .export-row {
   display: flex;
   gap: 0.5rem;
