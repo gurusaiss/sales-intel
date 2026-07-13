@@ -237,7 +237,9 @@ async function captureCurrentPage() {
   document.getElementById("cap-email").value = extracted.email || "";
   document.getElementById("cap-phone").value = extracted.phone || "";
   document.getElementById("capture-form").hidden = false;
-  statusEl.textContent = "Review and edit before saving.";
+  statusEl.textContent = extracted.checkedContactPage
+    ? `No contact info on this page — also checked ${extracted.checkedContactPage}. Review and edit before saving.`
+    : "Review and edit before saving.";
 }
 
 /**
@@ -246,30 +248,63 @@ async function captureCurrentPage() {
  * visible on screen, the same information any visitor could read manually.
  * No storage writes happen here; it only returns data back to the popup for
  * the user to review.
+ *
+ * If the current page has no email/phone, it follows one same-site "Contact"
+ * link and reads that page too — still inside this single click, and still
+ * only same-origin fetches (a public contact page any visitor could open),
+ * not cross-site scraping and not a background/automatic process.
  */
-function extractPageContactInfo() {
-  const ogTitle = document.querySelector('meta[property="og:title"]')?.content ?? "";
-  const description =
-    document.querySelector('meta[name="description"]')?.content ??
-    document.querySelector('meta[property="og:description"]')?.content ??
-    "";
+async function extractPageContactInfo() {
+  function readContactInfo(doc, baseUrl) {
+    const ogTitle = doc.querySelector('meta[property="og:title"]')?.content ?? "";
+    const description =
+      doc.querySelector('meta[name="description"]')?.content ??
+      doc.querySelector('meta[property="og:description"]')?.content ??
+      "";
+    const name =
+      doc.querySelector("h1")?.textContent?.trim() ||
+      ogTitle.split(/[-|]/)[0]?.trim() ||
+      doc.title.split(/[-|]/)[0]?.trim() ||
+      "";
+    const email = doc.querySelector('a[href^="mailto:"]')?.href.replace("mailto:", "") || "";
+    const phone = doc.querySelector('a[href^="tel:"]')?.href.replace("tel:", "") || "";
+    return { name, role: description.slice(0, 140), email, phone, sourceUrl: baseUrl };
+  }
 
-  const name =
-    document.querySelector("h1")?.textContent?.trim() ||
-    ogTitle.split(/[-|]/)[0]?.trim() ||
-    document.title.split(/[-|]/)[0]?.trim() ||
-    "";
+  function findContactLink(doc) {
+    const links = Array.from(doc.querySelectorAll("a[href]"));
+    const match = links.find((a) => /contact/i.test(`${a.textContent} ${a.href}`));
+    return match?.href || null;
+  }
 
-  const email = document.querySelector('a[href^="mailto:"]')?.href.replace("mailto:", "") || "";
-  const phone = document.querySelector('a[href^="tel:"]')?.href.replace("tel:", "") || "";
+  const pageUrl = window.location.href.split("?")[0];
+  const current = readContactInfo(document, pageUrl);
 
-  return {
-    name,
-    url: window.location.href.split("?")[0],
-    role: description.slice(0, 140),
-    email,
-    phone,
-  };
+  if (current.email || current.phone) {
+    return { ...current, url: pageUrl };
+  }
+
+  const contactHref = findContactLink(document);
+  if (!contactHref || new URL(contactHref, location.href).origin !== location.origin) {
+    return { ...current, url: pageUrl };
+  }
+
+  try {
+    const res = await fetch(contactHref, { credentials: "omit" });
+    const html = await res.text();
+    const contactDoc = new DOMParser().parseFromString(html, "text/html");
+    const fromContactPage = readContactInfo(contactDoc, contactHref);
+    return {
+      name: current.name || fromContactPage.name,
+      role: current.role || fromContactPage.role,
+      email: fromContactPage.email || current.email,
+      phone: fromContactPage.phone || current.phone,
+      url: pageUrl,
+      checkedContactPage: contactHref,
+    };
+  } catch {
+    return { ...current, url: pageUrl };
+  }
 }
 
 async function saveCapturedPage() {
