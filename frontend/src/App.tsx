@@ -6,9 +6,10 @@ import AnalyticsView from "./AnalyticsView";
 import CompanySearchView from "./CompanySearchView";
 import CareerView from "./CareerView";
 import AuthBar from "./AuthBar";
+import HistoryView from "./HistoryView";
 import "./App.css";
 
-type Tab = "research" | "companies" | "queue" | "analytics" | "career";
+type Tab = "research" | "companies" | "queue" | "analytics" | "career" | "history";
 
 function App() {
   const [tab, setTab] = useState<Tab>("research");
@@ -57,7 +58,9 @@ function App() {
                 ? "Outreach queue"
                 : tab === "career"
                   ? "Career tools"
-                  : "Analytics"}
+                  : tab === "history"
+                    ? "History"
+                    : "Analytics"}
         </h1>
         <nav className="tab-row" aria-label="View">
           <button
@@ -83,6 +86,12 @@ function App() {
             onClick={() => setTab("career")}
           >
             Career
+          </button>
+          <button
+            className={`tab-button ${tab === "history" ? "active" : ""}`}
+            onClick={() => setTab("history")}
+          >
+            History
           </button>
           <button
             className={`tab-button ${tab === "analytics" ? "active" : ""}`}
@@ -141,6 +150,8 @@ function App() {
         <QueueView />
       ) : tab === "career" ? (
         <CareerView />
+      ) : tab === "history" ? (
+        <HistoryView />
       ) : (
         <AnalyticsView />
       )}

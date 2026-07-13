@@ -44,6 +44,12 @@ export async function fetchQueue(limit = 15): Promise<QueueResponse> {
   return handleResponse(res);
 }
 
+export async function fetchAllPersons(): Promise<CrmPerson[]> {
+  const res = await fetch(`${API_BASE}/api/persons`, { headers: authHeaders() });
+  const data = await handleResponse<{ persons: CrmPerson[] }>(res);
+  return data.persons;
+}
+
 export async function updatePersonStatus(
   linkedinUrl: string,
   status: ContactStatus

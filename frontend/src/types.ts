@@ -77,6 +77,7 @@ export interface CrmPerson {
   status: ContactStatus;
   publicEmail?: string;
   phone?: string;
+  createdAt: string;
   updatedAt: string;
 }
 
