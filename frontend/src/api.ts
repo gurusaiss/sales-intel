@@ -247,3 +247,107 @@ export async function downloadLeadsExport(format: "csv" | "json"): Promise<void>
   link.remove();
   URL.revokeObjectURL(url);
 }
+
+export interface Resume {
+  text: string;
+  updatedAt: string;
+}
+
+export async function fetchResume(): Promise<Resume | null> {
+  const res = await fetch(`${API_BASE}/api/resume`, { headers: authHeaders() });
+  const data = await handleResponse<{ resume: Resume | null }>(res);
+  return data.resume;
+}
+
+export async function saveResumeText(text: string): Promise<Resume> {
+  const res = await fetch(`${API_BASE}/api/resume`, {
+    method: "POST",
+    headers: authHeaders({ "content-type": "application/json" }),
+    body: JSON.stringify({ text }),
+  });
+  const data = await handleResponse<{ resume: Resume }>(res);
+  return data.resume;
+}
+
+export interface JobMatchResult {
+  score: number;
+  strengths: string[];
+  gaps: string[];
+  summary: string;
+}
+
+export async function scoreJobMatch(jobDescription: string): Promise<JobMatchResult> {
+  const res = await fetch(`${API_BASE}/api/job-match`, {
+    method: "POST",
+    headers: authHeaders({ "content-type": "application/json" }),
+    body: JSON.stringify({ jobDescription }),
+  });
+  return handleResponse(res);
+}
+
+export async function generateCoverLetter(
+  jobDescription: string,
+  company: string,
+  role: string
+): Promise<string> {
+  const res = await fetch(`${API_BASE}/api/cover-letter`, {
+    method: "POST",
+    headers: authHeaders({ "content-type": "application/json" }),
+    body: JSON.stringify({ jobDescription, company, role }),
+  });
+  const data = await handleResponse<{ coverLetter: string }>(res);
+  return data.coverLetter;
+}
+
+export type JobStatus = "saved" | "applied" | "interviewing" | "offer" | "rejected";
+
+export interface JobApplication {
+  id: string;
+  company: string;
+  role: string;
+  jobDescription?: string;
+  status: JobStatus;
+  referralContactName?: string;
+  referralContactEmail?: string;
+  appliedDate?: string;
+  notes: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export async function fetchJobs(): Promise<JobApplication[]> {
+  const res = await fetch(`${API_BASE}/api/jobs`, { headers: authHeaders() });
+  const data = await handleResponse<{ jobs: JobApplication[] }>(res);
+  return data.jobs;
+}
+
+export async function addJobApplication(
+  company: string,
+  role: string,
+  referralContactName?: string
+): Promise<JobApplication> {
+  const res = await fetch(`${API_BASE}/api/jobs`, {
+    method: "POST",
+    headers: authHeaders({ "content-type": "application/json" }),
+    body: JSON.stringify({ company, role, referralContactName }),
+  });
+  const data = await handleResponse<{ job: JobApplication }>(res);
+  return data.job;
+}
+
+export async function updateJobStatus(id: string, status: JobStatus): Promise<void> {
+  const res = await fetch(`${API_BASE}/api/jobs/${encodeURIComponent(id)}`, {
+    method: "PATCH",
+    headers: authHeaders({ "content-type": "application/json" }),
+    body: JSON.stringify({ status }),
+  });
+  await handleResponse(res);
+}
+
+export async function deleteJobApplication(id: string): Promise<void> {
+  const res = await fetch(`${API_BASE}/api/jobs/${encodeURIComponent(id)}`, {
+    method: "DELETE",
+    headers: authHeaders(),
+  });
+  await handleResponse(res);
+}

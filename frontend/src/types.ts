@@ -56,6 +56,11 @@ export type TemplateCategory =
   | "investor"
   | "sir"
   | "madam"
+  | "hiring_manager"
+  | "engineer"
+  | "referral_request"
+  | "internship_request"
+  | "cold_outreach"
   | "unclassified";
 
 export type ContactStatus = "no_reply" | "replied" | "booked" | "closed" | "do_not_contact";

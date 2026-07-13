@@ -11,7 +11,7 @@ interface AiOutput {
   outreachDraft: { subject: string; body: string };
 }
 
-async function callGroq(prompt: string, maxTokens: number): Promise<string | null> {
+export async function callGroq(prompt: string, maxTokens: number): Promise<string | null> {
   if (!GROQ_API_KEY) return null;
 
   try {

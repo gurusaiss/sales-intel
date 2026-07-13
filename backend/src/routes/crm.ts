@@ -17,6 +17,22 @@ import { requireApiKey } from "../middleware/apiKey";
 
 const router = Router();
 
+const TEMPLATE_CATEGORIES = [
+  "ceo",
+  "founder",
+  "recruiter",
+  "hr",
+  "investor",
+  "sir",
+  "madam",
+  "hiring_manager",
+  "engineer",
+  "referral_request",
+  "internship_request",
+  "cold_outreach",
+  "unclassified",
+] as const;
+
 const visibleMessageSchema = z.object({
   direction: z.enum(["outbound", "inbound"]),
   text: z.string().trim().min(1),
@@ -78,7 +94,7 @@ const patchSchema = z.object({
   priority: z.number().min(1).max(5).optional(),
   status: z.enum(["no_reply", "replied", "booked", "closed", "do_not_contact"]).optional(),
   templateCategory: z
-    .enum(["ceo", "founder", "recruiter", "hr", "investor", "sir", "madam", "unclassified"])
+    .enum(TEMPLATE_CATEGORIES)
     .optional(),
   notes: z
     .array(z.object({ text: z.string(), createdAt: z.string(), author: z.string().optional() }))
@@ -141,7 +157,7 @@ router.post("/persons/:linkedinUrl/meetings", requireApiKey, async (req, res) =>
 
 const draftSchema = captureSchema.extend({
   templateOverride: z
-    .enum(["ceo", "founder", "recruiter", "hr", "investor", "sir", "madam", "unclassified"])
+    .enum(TEMPLATE_CATEGORIES)
     .optional(),
 });
 

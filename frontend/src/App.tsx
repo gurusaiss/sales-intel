@@ -4,9 +4,10 @@ import type { ResearchResponse, CrmPerson } from "./types";
 import QueueView from "./QueueView";
 import AnalyticsView from "./AnalyticsView";
 import CompanySearchView from "./CompanySearchView";
+import CareerView from "./CareerView";
 import "./App.css";
 
-type Tab = "research" | "companies" | "queue" | "analytics";
+type Tab = "research" | "companies" | "queue" | "analytics" | "career";
 
 function App() {
   const [tab, setTab] = useState<Tab>("research");
@@ -52,7 +53,9 @@ function App() {
               ? "Find people at a company"
               : tab === "queue"
                 ? "Outreach queue"
-                : "Analytics"}
+                : tab === "career"
+                  ? "Career tools"
+                  : "Analytics"}
         </h1>
         <nav className="tab-row" aria-label="View">
           <button
@@ -72,6 +75,12 @@ function App() {
             onClick={() => setTab("queue")}
           >
             Queue
+          </button>
+          <button
+            className={`tab-button ${tab === "career" ? "active" : ""}`}
+            onClick={() => setTab("career")}
+          >
+            Career
           </button>
           <button
             className={`tab-button ${tab === "analytics" ? "active" : ""}`}
@@ -128,6 +137,8 @@ function App() {
         <CompanySearchView />
       ) : tab === "queue" ? (
         <QueueView />
+      ) : tab === "career" ? (
+        <CareerView />
       ) : (
         <AnalyticsView />
       )}

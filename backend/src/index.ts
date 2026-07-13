@@ -5,6 +5,7 @@ import searchRouter from "./routes/search";
 import crmRouter from "./routes/crm";
 import authRouter from "./routes/auth";
 import leadsRouter from "./routes/leads";
+import careerRouter from "./routes/career";
 
 const app = express();
 const PORT = process.env.PORT ? Number(process.env.PORT) : 4000;
@@ -22,6 +23,7 @@ app.use("/api", searchRouter);
 app.use("/api", crmRouter);
 app.use("/api", authRouter);
 app.use("/api", leadsRouter);
+app.use("/api", careerRouter);
 
 app.listen(PORT, () => {
   console.log(`Backend listening on http://localhost:${PORT}`);
