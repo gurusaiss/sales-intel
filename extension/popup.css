@@ -74,3 +74,61 @@ h1 {
   text-align: center;
   font-size: 0.8rem;
 }
+
+.nudge-banner {
+  margin: 0 1rem 0.6rem;
+  padding: 0.6rem 0.75rem;
+  border: 1px solid var(--accent);
+  border-radius: 6px;
+  background: var(--accent-soft);
+  color: var(--accent);
+  font-size: 0.75rem;
+  line-height: 1.4;
+}
+
+#booking-profile {
+  border-top: 1px solid var(--border);
+  padding: 0.9rem 1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+#booking-profile h2 {
+  font-size: 0.85rem;
+  margin: 0;
+}
+
+#booking-profile label {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+  font-size: 0.72rem;
+  color: var(--muted);
+}
+
+#booking-profile input {
+  font-size: 0.82rem;
+  padding: 0.35rem 0.5rem;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--card);
+  color: var(--ink);
+}
+
+#booking-save {
+  align-self: flex-start;
+  background: var(--accent);
+  color: #fff;
+  border: none;
+  border-radius: 6px;
+  padding: 0.4rem 0.9rem;
+  font-size: 0.78rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+#booking-save-status {
+  font-size: 0.72rem;
+  color: var(--accent);
+}

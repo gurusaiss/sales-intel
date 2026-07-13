@@ -18,6 +18,17 @@
       "js": ["content.js"],
       "css": ["content.css"],
       "run_at": "document_idle"
+    },
+    {
+      "matches": [
+        "https://calendly.com/*",
+        "https://*.calendly.com/*",
+        "https://cal.com/*",
+        "https://app.cal.com/*"
+      ],
+      "js": ["bookingfill.js"],
+      "css": ["bookingfill.css"],
+      "run_at": "document_idle"
     }
   ],
   "action": {

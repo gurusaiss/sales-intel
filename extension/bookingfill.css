@@ -1,0 +1,36 @@
+#ria-bookingfill-button {
+  position: fixed;
+  bottom: 24px;
+  right: 24px;
+  z-index: 999999;
+  background: #1c1a17;
+  color: #fff;
+  border: none;
+  border-radius: 999px;
+  padding: 0.75rem 1.25rem;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  font-size: 0.9rem;
+  font-weight: 600;
+  cursor: pointer;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.25);
+}
+
+#ria-bookingfill-button:hover {
+  background: #34302a;
+}
+
+#ria-bookingfill-status {
+  position: fixed;
+  bottom: 80px;
+  right: 24px;
+  z-index: 999999;
+  max-width: 280px;
+  background: #ffffff;
+  color: #1c1a17;
+  border: 1px solid #e3ddd2;
+  border-radius: 8px;
+  padding: 0.6rem 0.9rem;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  font-size: 0.8rem;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.2);
+}

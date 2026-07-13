@@ -10,7 +10,18 @@
       <h1>Tracked people</h1>
       <p class="sub">Open a LinkedIn conversation and click "Draft follow-up" to add someone here.</p>
     </header>
+    <div id="nudge"></div>
     <div id="list"></div>
+
+    <section id="booking-profile">
+      <h2>Booking profile</h2>
+      <p class="sub">Used to fill your own name/email on Calendly/Cal.com pages you visit — never submitted automatically.</p>
+      <label>Your name<input id="booking-name" type="text" /></label>
+      <label>Your email<input id="booking-email" type="email" /></label>
+      <button id="booking-save">Save</button>
+      <span id="booking-save-status"></span>
+    </section>
+
     <script src="config.js"></script>
     <script src="popup.js"></script>
   </body>
