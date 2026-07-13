@@ -474,3 +474,49 @@ h1 {
   font-size: 0.75rem;
   color: var(--muted);
 }
+
+.lead-table {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  overflow-x: auto;
+}
+
+.lead-row {
+  display: grid;
+  grid-template-columns: 24px 1.2fr 1fr 1.4fr 0.9fr;
+  align-items: center;
+  gap: 0.6rem;
+  padding: 0.4rem 0;
+  font-size: 0.82rem;
+  border-bottom: 1px solid var(--border);
+  min-width: 640px;
+}
+
+.lead-header {
+  font-family: var(--mono);
+  font-size: 0.68rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--muted);
+  border-bottom: 1px solid var(--border);
+}
+
+.lead-status-cell {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  flex-wrap: wrap;
+}
+
+.badge-high {
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+
+.badge-low,
+.badge-unverified {
+  background: var(--paper);
+  color: var(--muted);
+  border: 1px solid var(--border);
+}

@@ -4,6 +4,7 @@ import cors from "cors";
 import searchRouter from "./routes/search";
 import crmRouter from "./routes/crm";
 import authRouter from "./routes/auth";
+import leadsRouter from "./routes/leads";
 
 const app = express();
 const PORT = process.env.PORT ? Number(process.env.PORT) : 4000;
@@ -20,6 +21,7 @@ app.get("/health", (_req, res) => res.json({ status: "ok" }));
 app.use("/api", searchRouter);
 app.use("/api", crmRouter);
 app.use("/api", authRouter);
+app.use("/api", leadsRouter);
 
 app.listen(PORT, () => {
   console.log(`Backend listening on http://localhost:${PORT}`);

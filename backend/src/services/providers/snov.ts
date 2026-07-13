@@ -1,5 +1,6 @@
 import { EnrichmentProvider } from "../enrichment";
 import { EnrichmentResult, PersonInfo, CompanyInfo } from "../../types";
+import { CompanySearchResult } from "../../types/leads";
 
 const SNOV_BASE = "https://api.snov.io";
 
@@ -54,6 +55,28 @@ export class SnovEnrichmentProvider implements EnrichmentProvider {
       person,
       company,
       sources: ["snov.io"],
+    };
+  }
+
+  /**
+   * Full people list for a domain — Snov's domain search already returns
+   * this array; lookup() above only ever surfaced one best-effort match.
+   */
+  async searchPeopleAtDomain(domain: string): Promise<CompanySearchResult | undefined> {
+    const token = await this.getAccessToken();
+    const domainResult = await this.domainSearch(token, domain);
+    if (!domainResult?.emails?.length) return undefined;
+
+    return {
+      company: { name: domain, domain, website: `https://${domain}` },
+      people: domainResult.emails.map((e) => ({
+        name: [e.first_name, e.last_name].filter(Boolean).join(" ") || "Unknown",
+        title: e.position,
+        email: e.email,
+        emailConfidence: "medium" as const,
+        sourceUrl: e.sourcePage,
+      })),
+      source: "snov.io",
     };
   }
 

@@ -1,5 +1,6 @@
 import { EnrichmentProvider } from "../enrichment";
 import { EnrichmentResult, PersonInfo, CompanyInfo } from "../../types";
+import { CompanySearchResult } from "../../types/leads";
 
 const HUNTER_BASE = "https://api.hunter.io/v2";
 
@@ -49,21 +50,53 @@ export class HunterEnrichmentProvider implements EnrichmentProvider {
 
     const isPersonQuery = query.trim().includes(" ") && !isLikelyCompanyName(query);
 
-    const [companyResult, personResult] = await Promise.all([
+    const [domainData, personResult] = await Promise.all([
       this.domainSearch(domain),
       isPersonQuery ? this.emailFinder(query, domain) : Promise.resolve(null),
     ]);
 
-    const person: PersonInfo = personResult ?? this.personFromDomainSearch(query, companyResult);
+    const person: PersonInfo = personResult ?? this.personFromDomainSearch(query, domainData?.company);
 
     return {
       person,
-      company: companyResult ?? undefined,
+      company: domainData?.company,
       sources: ["hunter.io"],
     };
   }
 
-  private async domainSearch(domain: string): Promise<CompanyInfo | undefined> {
+  /**
+   * Full people list for a domain — the actual "search company, get everyone
+   * there" use case. Hunter's domain-search already returns this array; the
+   * single-person lookup() above only ever surfaced one match from it.
+   */
+  async searchPeopleAtDomain(domain: string): Promise<CompanySearchResult | undefined> {
+    const domainData = await this.domainSearch(domain);
+    if (!domainData) return undefined;
+
+    return {
+      company: {
+        name: domainData.company.name,
+        domain,
+        website: domainData.company.website,
+        description: domainData.company.description,
+        industry: domainData.company.industry,
+        employeeRange: domainData.company.employeeRange,
+        socials: domainData.company.socials,
+      },
+      people: domainData.emails.map((e) => ({
+        name: [e.first_name, e.last_name].filter(Boolean).join(" ") || "Unknown",
+        title: e.position,
+        email: e.value,
+        emailConfidence: scoreToConfidence(e.confidence),
+        sourceUrl: e.sources?.[0]?.uri,
+      })),
+      source: "hunter.io",
+    };
+  }
+
+  private async domainSearch(
+    domain: string
+  ): Promise<{ company: CompanyInfo; emails: HunterDomainSearchResponse["data"]["emails"] } | undefined> {
     const res = await fetch(
       `${HUNTER_BASE}/domain-search?domain=${encodeURIComponent(domain)}&api_key=${this.apiKey}`
     );
@@ -74,7 +107,7 @@ export class HunterEnrichmentProvider implements EnrichmentProvider {
     const json = (await res.json()) as HunterDomainSearchResponse;
     const d = json.data;
 
-    return {
+    const company: CompanyInfo = {
       name: d.organization ?? domain,
       domain: d.domain,
       website: `https://${d.domain}`,
@@ -88,6 +121,8 @@ export class HunterEnrichmentProvider implements EnrichmentProvider {
         d.twitter ? { platform: "Twitter", url: `https://twitter.com/${d.twitter}` } : undefined,
       ].filter((s): s is { platform: string; url: string } => Boolean(s)),
     };
+
+    return { company, emails: d.emails };
   }
 
   private async emailFinder(fullName: string, domain: string): Promise<PersonInfo | null> {

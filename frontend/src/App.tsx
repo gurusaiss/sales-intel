@@ -3,9 +3,10 @@ import { searchQuery, findLinkedPerson } from "./api";
 import type { ResearchResponse, CrmPerson } from "./types";
 import QueueView from "./QueueView";
 import AnalyticsView from "./AnalyticsView";
+import CompanySearchView from "./CompanySearchView";
 import "./App.css";
 
-type Tab = "research" | "queue" | "analytics";
+type Tab = "research" | "companies" | "queue" | "analytics";
 
 function App() {
   const [tab, setTab] = useState<Tab>("research");
@@ -47,9 +48,11 @@ function App() {
         <h1>
           {tab === "research"
             ? "Look up a person or company"
-            : tab === "queue"
-              ? "Outreach queue"
-              : "Analytics"}
+            : tab === "companies"
+              ? "Find people at a company"
+              : tab === "queue"
+                ? "Outreach queue"
+                : "Analytics"}
         </h1>
         <nav className="tab-row" aria-label="View">
           <button
@@ -57,6 +60,12 @@ function App() {
             onClick={() => setTab("research")}
           >
             Research
+          </button>
+          <button
+            className={`tab-button ${tab === "companies" ? "active" : ""}`}
+            onClick={() => setTab("companies")}
+          >
+            Companies
           </button>
           <button
             className={`tab-button ${tab === "queue" ? "active" : ""}`}
@@ -115,6 +124,8 @@ function App() {
             </p>
           )}
         </>
+      ) : tab === "companies" ? (
+        <CompanySearchView />
       ) : tab === "queue" ? (
         <QueueView />
       ) : (

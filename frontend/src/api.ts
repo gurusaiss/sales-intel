@@ -132,3 +132,118 @@ export async function fetchAnalytics(): Promise<AnalyticsResponse> {
   const res = await fetch(`${API_BASE}/api/analytics`, { headers: authHeaders() });
   return handleResponse(res);
 }
+
+export interface CandidateLead {
+  name: string;
+  title?: string;
+  email?: string;
+  emailConfidence?: "high" | "medium" | "low" | "unverified";
+  sourceUrl?: string;
+}
+
+export interface CompanySearchResult {
+  company: {
+    name: string;
+    domain: string;
+    website?: string;
+    description?: string;
+    industry?: string;
+    employeeRange?: string;
+    socials?: { platform: string; url: string }[];
+  };
+  people: CandidateLead[];
+  source: string;
+}
+
+export async function searchCompany(company: string, domain: string): Promise<CompanySearchResult> {
+  const res = await fetch(`${API_BASE}/api/company-search`, {
+    method: "POST",
+    headers: authHeaders({ "content-type": "application/json" }),
+    body: JSON.stringify({ company, domain }),
+  });
+  return handleResponse(res);
+}
+
+export type LeadStatus = "new" | "contacted" | "archived";
+
+export interface Lead {
+  id: string;
+  name: string;
+  company?: string;
+  companyDomain?: string;
+  title?: string;
+  linkedinUrl?: string;
+  website?: string;
+  publicEmail?: string;
+  emailConfidence?: string;
+  phone?: string;
+  tags: string[];
+  notes: string;
+  status: LeadStatus;
+  priority: number;
+  source: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export async function addLeadsToCrm(
+  company: string,
+  companyDomain: string,
+  source: string,
+  people: CandidateLead[]
+): Promise<Lead[]> {
+  const res = await fetch(`${API_BASE}/api/leads`, {
+    method: "POST",
+    headers: authHeaders({ "content-type": "application/json" }),
+    body: JSON.stringify({ company, companyDomain, source, people }),
+  });
+  const data = await handleResponse<{ leads: Lead[] }>(res);
+  return data.leads;
+}
+
+export async function fetchLeads(): Promise<Lead[]> {
+  const res = await fetch(`${API_BASE}/api/leads`, { headers: authHeaders() });
+  const data = await handleResponse<{ leads: Lead[] }>(res);
+  return data.leads;
+}
+
+export async function updateLeadStatus(id: string, status: LeadStatus): Promise<void> {
+  const res = await fetch(`${API_BASE}/api/leads/${encodeURIComponent(id)}`, {
+    method: "PATCH",
+    headers: authHeaders({ "content-type": "application/json" }),
+    body: JSON.stringify({ status }),
+  });
+  await handleResponse(res);
+}
+
+export async function deleteLeadById(id: string): Promise<void> {
+  const res = await fetch(`${API_BASE}/api/leads/${encodeURIComponent(id)}`, {
+    method: "DELETE",
+    headers: authHeaders(),
+  });
+  await handleResponse(res);
+}
+
+/**
+ * Downloads the export as a Blob rather than a plain link — a plain <a href>
+ * navigation can't carry the x-api-key header, so it would 401 the moment
+ * APP_API_KEY is set on the backend.
+ */
+export async function downloadLeadsExport(format: "csv" | "json"): Promise<void> {
+  const res = await fetch(`${API_BASE}/api/leads/export?format=${format}`, {
+    headers: authHeaders(),
+  });
+  if (!res.ok) {
+    const body = await res.json().catch(() => ({}));
+    throw new Error(body.error ?? `Export failed with status ${res.status}`);
+  }
+  const blob = await res.blob();
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = `leads.${format}`;
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  URL.revokeObjectURL(url);
+}

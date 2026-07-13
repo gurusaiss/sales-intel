@@ -1,6 +1,7 @@
 import { EnrichmentResult } from "../types";
 import { HunterEnrichmentProvider } from "./providers/hunter";
 import { SnovEnrichmentProvider } from "./providers/snov";
+import { CompanySearchResult } from "../types/leads";
 
 /**
  * Enrichment is provider-agnostic by design: swapping the mock provider for
@@ -99,4 +100,55 @@ export function getEnrichmentProvider(domain?: string): EnrichmentProvider {
     return new SnovEnrichmentProvider(process.env.SNOV_CLIENT_ID, process.env.SNOV_CLIENT_SECRET);
   }
   return mockProvider;
+}
+
+/**
+ * Company-first search: "who works at this company" — a different shape
+ * than the single-person lookup above. Real providers return their actual
+ * domain-search results; without real keys, a synthetic candidate list
+ * keeps the feature demoable and testable end-to-end.
+ */
+export async function searchCompanyPeople(
+  companyName: string,
+  domain: string
+): Promise<CompanySearchResult> {
+  if (process.env.HUNTER_API_KEY) {
+    const result = await new HunterEnrichmentProvider(process.env.HUNTER_API_KEY).searchPeopleAtDomain(
+      domain
+    );
+    if (result && result.people.length > 0) return result;
+  }
+  if (process.env.SNOV_CLIENT_ID && process.env.SNOV_CLIENT_SECRET) {
+    const result = await new SnovEnrichmentProvider(
+      process.env.SNOV_CLIENT_ID,
+      process.env.SNOV_CLIENT_SECRET
+    ).searchPeopleAtDomain(domain);
+    if (result && result.people.length > 0) return result;
+  }
+  return mockCompanySearch(companyName, domain);
+}
+
+function mockCompanySearch(companyName: string, domain: string): CompanySearchResult {
+  const titles = ["Founder", "VP of Sales", "Head of Marketing", "Recruiter", "Engineering Manager"];
+  const firstNames = ["Alex", "Priya", "Jordan", "Sam", "Morgan"];
+  const lastNames = ["Rivera", "Chen", "Patel", "Kelly", "Nguyen"];
+
+  return {
+    company: {
+      name: companyName,
+      domain,
+      website: `https://${domain}`,
+      description: `${companyName} builds tools for mid-market revenue teams.`,
+      industry: "B2B SaaS",
+      employeeRange: "51-200",
+      socials: [{ platform: "LinkedIn", url: `https://www.linkedin.com/company/${slug(companyName)}` }],
+    },
+    people: titles.map((title, i) => ({
+      name: `${firstNames[i]} ${lastNames[i]}`,
+      title,
+      email: `${firstNames[i].toLowerCase()}.${lastNames[i].toLowerCase()}@${domain}`,
+      emailConfidence: "unverified" as const,
+    })),
+    source: "mock-provider",
+  };
 }
