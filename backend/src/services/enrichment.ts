@@ -113,17 +113,25 @@ export async function searchCompanyPeople(
   domain: string
 ): Promise<CompanySearchResult> {
   if (process.env.HUNTER_API_KEY) {
-    const result = await new HunterEnrichmentProvider(process.env.HUNTER_API_KEY).searchPeopleAtDomain(
-      domain
-    );
-    if (result && result.people.length > 0) return result;
+    try {
+      const result = await new HunterEnrichmentProvider(
+        process.env.HUNTER_API_KEY
+      ).searchPeopleAtDomain(domain);
+      if (result && result.people.length > 0) return result;
+    } catch (err) {
+      console.error("Hunter company search failed, falling through to next provider", err);
+    }
   }
   if (process.env.SNOV_CLIENT_ID && process.env.SNOV_CLIENT_SECRET) {
-    const result = await new SnovEnrichmentProvider(
-      process.env.SNOV_CLIENT_ID,
-      process.env.SNOV_CLIENT_SECRET
-    ).searchPeopleAtDomain(domain);
-    if (result && result.people.length > 0) return result;
+    try {
+      const result = await new SnovEnrichmentProvider(
+        process.env.SNOV_CLIENT_ID,
+        process.env.SNOV_CLIENT_SECRET
+      ).searchPeopleAtDomain(domain);
+      if (result && result.people.length > 0) return result;
+    } catch (err) {
+      console.error("Snov company search failed, falling through to next provider", err);
+    }
   }
   return mockCompanySearch(companyName, domain);
 }

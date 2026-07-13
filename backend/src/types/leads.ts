@@ -6,6 +6,8 @@ export interface CandidateLead {
   email?: string;
   emailConfidence?: EmailConfidence;
   sourceUrl?: string;
+  tier?: "leadership" | "hiring" | "employee" | "unclassified";
+  department?: string;
 }
 
 export interface CompanySearchResult {

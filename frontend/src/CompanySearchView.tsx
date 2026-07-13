@@ -1,4 +1,4 @@
-import { useState, type FormEvent } from "react";
+import { useState, useMemo, type FormEvent } from "react";
 import {
   searchCompany,
   addLeadsToCrm,
@@ -11,15 +11,50 @@ import {
   type Lead,
 } from "./api";
 
+const DEPARTMENT_OPTIONS = [
+  { value: "all", label: "All departments" },
+  { value: "founders", label: "Founders" },
+  { value: "executives", label: "Executives" },
+  { value: "engineering", label: "Engineering" },
+  { value: "product", label: "Product" },
+  { value: "hr", label: "HR" },
+  { value: "recruiting", label: "Recruiters" },
+  { value: "sales", label: "Sales" },
+  { value: "marketing", label: "Marketing" },
+  { value: "finance", label: "Finance" },
+  { value: "operations", label: "Operations" },
+  { value: "customer_success", label: "Customer Success" },
+  { value: "legal", label: "Legal" },
+  { value: "security", label: "Security" },
+  { value: "cloud", label: "Cloud" },
+  { value: "ai", label: "AI" },
+  { value: "data", label: "Data" },
+  { value: "support", label: "Support" },
+];
+
+const TIER_LABELS: Record<string, string> = {
+  leadership: "Leadership",
+  hiring: "Hiring & Management",
+  employee: "Employees",
+  unclassified: "Unclassified",
+};
+
+function candidateKey(person: CandidateLead, index: number): string {
+  return `${person.email ?? person.name}-${index}`;
+}
+
 export default function CompanySearchView() {
   const [company, setCompany] = useState("");
   const [domain, setDomain] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [result, setResult] = useState<CompanySearchResult | null>(null);
-  const [selected, setSelected] = useState<Set<number>>(new Set());
+  const [selected, setSelected] = useState<Set<string>>(new Set());
   const [saving, setSaving] = useState(false);
   const [savedMessage, setSavedMessage] = useState<string | null>(null);
+
+  const [keyword, setKeyword] = useState("");
+  const [department, setDepartment] = useState("all");
 
   const [leads, setLeads] = useState<Lead[]>([]);
   const [leadsLoaded, setLeadsLoaded] = useState(false);
@@ -31,6 +66,8 @@ export default function CompanySearchView() {
     setError(null);
     setResult(null);
     setSelected(new Set());
+    setKeyword("");
+    setDepartment("all");
     try {
       const data = await searchCompany(company.trim(), domain.trim());
       setResult(data);
@@ -41,20 +78,53 @@ export default function CompanySearchView() {
     }
   }
 
-  function toggleSelected(index: number) {
+  const indexedPeople = useMemo(
+    () => (result?.people ?? []).map((person, i) => ({ person, key: candidateKey(person, i) })),
+    [result]
+  );
+
+  const filteredPeople = useMemo(() => {
+    const keywordLower = keyword.trim().toLowerCase();
+    return indexedPeople.filter(({ person }) => {
+      if (department !== "all" && person.department !== department) return false;
+      if (keywordLower && !`${person.name} ${person.title ?? ""}`.toLowerCase().includes(keywordLower)) {
+        return false;
+      }
+      return true;
+    });
+  }, [indexedPeople, keyword, department]);
+
+  const grouped = useMemo(() => {
+    const groups: Record<string, typeof filteredPeople> = {
+      leadership: [],
+      hiring: [],
+      employee: [],
+      unclassified: [],
+    };
+    for (const item of filteredPeople) {
+      const tier = item.person.tier ?? "unclassified";
+      groups[tier].push(item);
+    }
+    return groups;
+  }, [filteredPeople]);
+
+  function toggleSelected(key: string) {
     setSelected((current) => {
       const next = new Set(current);
-      if (next.has(index)) next.delete(index);
-      else next.add(index);
+      if (next.has(key)) next.delete(key);
+      else next.add(key);
       return next;
     });
   }
 
-  function toggleSelectAll() {
-    if (!result) return;
-    setSelected((current) =>
-      current.size === result.people.length ? new Set() : new Set(result.people.map((_, i) => i))
-    );
+  function toggleSelectAllInGroup(items: typeof filteredPeople) {
+    const keys = items.map((i) => i.key);
+    const allSelected = keys.every((k) => selected.has(k));
+    setSelected((current) => {
+      const next = new Set(current);
+      keys.forEach((k) => (allSelected ? next.delete(k) : next.add(k)));
+      return next;
+    });
   }
 
   async function handleAddSelected() {
@@ -62,7 +132,9 @@ export default function CompanySearchView() {
     setSaving(true);
     setSavedMessage(null);
     try {
-      const chosen: CandidateLead[] = Array.from(selected).map((i) => result.people[i]);
+      const chosen: CandidateLead[] = indexedPeople
+        .filter(({ key }) => selected.has(key))
+        .map(({ person }) => person);
       await addLeadsToCrm(result.company.name, result.company.domain, result.source, chosen);
       setSavedMessage(`Added ${chosen.length} lead${chosen.length === 1 ? "" : "s"} to your CRM.`);
       setSelected(new Set());
@@ -146,36 +218,75 @@ export default function CompanySearchView() {
             <p className="subline">No candidates found for this domain.</p>
           ) : (
             <>
-              <div className="lead-table">
-                <div className="lead-row lead-header">
-                  <input
-                    type="checkbox"
-                    checked={selected.size === result.people.length}
-                    onChange={toggleSelectAll}
-                    aria-label="Select all"
-                  />
-                  <span>Name</span>
-                  <span>Title</span>
-                  <span>Email</span>
-                  <span>Confidence</span>
-                </div>
-                {result.people.map((person, i) => (
-                  <div className="lead-row" key={`${person.email ?? person.name}-${i}`}>
-                    <input
-                      type="checkbox"
-                      checked={selected.has(i)}
-                      onChange={() => toggleSelected(i)}
-                      aria-label={`Select ${person.name}`}
-                    />
-                    <span>{person.name}</span>
-                    <span>{person.title ?? "—"}</span>
-                    <span>{person.email ?? "—"}</span>
-                    <span className={`badge badge-${person.emailConfidence ?? "unverified"}`}>
-                      {person.emailConfidence ?? "unverified"}
-                    </span>
-                  </div>
-                ))}
+              <div className="search-form" style={{ marginTop: 0 }}>
+                <input
+                  type="text"
+                  className="query-input"
+                  placeholder="Filter by keyword — e.g. Python"
+                  value={keyword}
+                  onChange={(e) => setKeyword(e.target.value)}
+                  aria-label="Keyword filter"
+                />
+                <select
+                  className="domain-input"
+                  value={department}
+                  onChange={(e) => setDepartment(e.target.value)}
+                  aria-label="Department filter"
+                >
+                  {DEPARTMENT_OPTIONS.map((opt) => (
+                    <option key={opt.value} value={opt.value}>
+                      {opt.label}
+                    </option>
+                  ))}
+                </select>
               </div>
+
+              {filteredPeople.length === 0 ? (
+                <p className="subline">No one matches this filter.</p>
+              ) : (
+                (["leadership", "hiring", "employee", "unclassified"] as const).map((tier) => {
+                  const items = grouped[tier];
+                  if (items.length === 0) return null;
+                  return (
+                    <div key={tier} className="tier-section">
+                      <div className="tier-header">
+                        <span>
+                          {TIER_LABELS[tier]} ({items.length})
+                        </span>
+                        <button className="ghost-button" onClick={() => toggleSelectAllInGroup(items)}>
+                          Select all
+                        </button>
+                      </div>
+                      <div className="lead-table">
+                        <div className="lead-row lead-header">
+                          <span />
+                          <span>Name</span>
+                          <span>Title</span>
+                          <span>Email</span>
+                          <span>Confidence</span>
+                        </div>
+                        {items.map(({ person, key }) => (
+                          <div className="lead-row" key={key}>
+                            <input
+                              type="checkbox"
+                              checked={selected.has(key)}
+                              onChange={() => toggleSelected(key)}
+                              aria-label={`Select ${person.name}`}
+                            />
+                            <span>{person.name}</span>
+                            <span>{person.title ?? "—"}</span>
+                            <span>{person.email ?? "—"}</span>
+                            <span className={`badge badge-${person.emailConfidence ?? "unverified"}`}>
+                              {person.emailConfidence ?? "unverified"}
+                            </span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  );
+                })
+              )}
+
               <div className="queue-actions">
                 <button
                   className="ghost-button accent"

@@ -139,6 +139,8 @@ export interface CandidateLead {
   email?: string;
   emailConfidence?: "high" | "medium" | "low" | "unverified";
   sourceUrl?: string;
+  tier?: "leadership" | "hiring" | "employee" | "unclassified";
+  department?: string;
 }
 
 export interface CompanySearchResult {

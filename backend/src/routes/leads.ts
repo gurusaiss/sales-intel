@@ -3,6 +3,9 @@ import { z } from "zod";
 import { searchCompanyPeople } from "../services/enrichment";
 import { addLeads, deleteLead, listLeads, updateLead, VALID_STATUSES } from "../services/leadStore";
 import { requireApiKey } from "../middleware/apiKey";
+import { classifyRole, leadershipRank } from "../services/roleClassifier";
+
+const TIER_ORDER = { leadership: 0, hiring: 1, employee: 2, unclassified: 3 } as const;
 
 const router = Router();
 
@@ -28,7 +31,20 @@ router.post("/company-search", requireApiKey, async (req, res) => {
 
   try {
     const result = await searchCompanyPeople(parsed.data.company, parsed.data.domain);
-    res.json(result);
+
+    // Classify + sort into tiers (leadership first, then hiring/management,
+    // then everyone else) — same rule-based approach as the LinkedIn
+    // template-category matcher, applied to compliant provider data.
+    const classified = result.people
+      .map((person) => ({ ...person, ...classifyRole(person.title) }))
+      .sort((a, b) => {
+        const tierDiff = TIER_ORDER[a.tier ?? "unclassified"] - TIER_ORDER[b.tier ?? "unclassified"];
+        if (tierDiff !== 0) return tierDiff;
+        if (a.tier === "leadership") return leadershipRank(a.title) - leadershipRank(b.title);
+        return 0;
+      });
+
+    res.json({ ...result, people: classified });
   } catch (err) {
     console.error("Company search failed", err);
     res.status(500).json({ error: "Company search failed. Please try again." });
