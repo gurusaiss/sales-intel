@@ -390,3 +390,12 @@ h1 {
   text-decoration: none;
   white-space: nowrap;
 }
+
+.linked-banner {
+  padding: 0.75rem 1rem;
+  border: 1px solid var(--accent);
+  border-radius: 8px;
+  background: var(--accent-soft);
+  font-size: 0.85rem;
+  line-height: 1.5;
+}

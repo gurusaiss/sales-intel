@@ -46,6 +46,29 @@ export async function getPerson(linkedinUrl: string): Promise<CrmPerson | undefi
 }
 
 /**
+ * Cross-channel identity linking: finds a tracked LinkedIn person by public
+ * email, company domain, or exact name — so the research tool can surface
+ * "you're already tracking this person" instead of treating every channel
+ * as a separate, disconnected contact.
+ */
+export async function findPersonByIdentity(params: {
+  email?: string;
+  domain?: string;
+  name?: string;
+}): Promise<CrmPerson | undefined> {
+  const all = await listPersons();
+  const emailLower = params.email?.toLowerCase();
+  const domainLower = params.domain?.toLowerCase();
+  const nameLower = params.name?.trim().toLowerCase();
+
+  return (
+    all.find((p) => emailLower && p.publicEmail?.toLowerCase() === emailLower) ??
+    all.find((p) => domainLower && p.companyDomain?.toLowerCase() === domainLower) ??
+    all.find((p) => nameLower && p.name.trim().toLowerCase() === nameLower)
+  );
+}
+
+/**
  * Creates the person on first capture, or updates+appends on repeat captures.
  * This is the only write path for LinkedIn-derived data — always triggered by
  * an explicit user action, never a background process.

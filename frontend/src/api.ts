@@ -1,4 +1,4 @@
-import type { ResearchResponse, QueueResponse, ContactStatus } from "./types";
+import type { ResearchResponse, QueueResponse, ContactStatus, CrmPerson } from "./types";
 
 const API_BASE = import.meta.env.VITE_API_BASE ?? "http://localhost:4000";
 
@@ -48,6 +48,21 @@ export async function fetchGoogleStatus(): Promise<GoogleStatus> {
 
 export function getGoogleConnectUrl(): string {
   return `${API_BASE}/api/auth/google`;
+}
+
+export async function findLinkedPerson(params: {
+  email?: string;
+  domain?: string;
+  name?: string;
+}): Promise<CrmPerson | null> {
+  const query = new URLSearchParams();
+  if (params.email) query.set("email", params.email);
+  if (params.domain) query.set("domain", params.domain);
+  if (params.name) query.set("name", params.name);
+
+  const res = await fetch(`${API_BASE}/api/persons/lookup?${query.toString()}`);
+  const data = await handleResponse<{ person: CrmPerson | null }>(res);
+  return data.person;
 }
 
 export async function sendViaGmail(

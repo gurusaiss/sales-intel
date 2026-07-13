@@ -2,6 +2,7 @@ import { Router } from "express";
 import { z } from "zod";
 import {
   captureOrUpdatePerson,
+  findPersonByIdentity,
   getPerson,
   listPersons,
   updatePerson,
@@ -30,6 +31,22 @@ const captureSchema = z.object({
 router.get("/persons", async (_req, res) => {
   const persons = await listPersons();
   res.json({ persons });
+});
+
+/**
+ * Cross-channel identity linking: lets the research tool ask "is this person
+ * already tracked from LinkedIn?" by email, company domain, or name — must be
+ * registered before the /:linkedinUrl route below or Express will treat
+ * "lookup" as a linkedinUrl param.
+ */
+router.get("/persons/lookup", async (req, res) => {
+  const { email, domain, name } = req.query;
+  const match = await findPersonByIdentity({
+    email: typeof email === "string" ? email : undefined,
+    domain: typeof domain === "string" ? domain : undefined,
+    name: typeof name === "string" ? name : undefined,
+  });
+  res.json({ person: match ?? null });
 });
 
 router.get("/persons/:linkedinUrl", async (req, res) => {

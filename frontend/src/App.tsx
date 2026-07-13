@@ -1,6 +1,6 @@
 import { useState, type FormEvent } from "react";
-import { searchQuery } from "./api";
-import type { ResearchResponse } from "./types";
+import { searchQuery, findLinkedPerson } from "./api";
+import type { ResearchResponse, CrmPerson } from "./types";
 import QueueView from "./QueueView";
 import "./App.css";
 
@@ -13,15 +13,24 @@ function App() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [result, setResult] = useState<ResearchResponse | null>(null);
+  const [linkedPerson, setLinkedPerson] = useState<CrmPerson | null>(null);
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
     if (!query.trim()) return;
     setLoading(true);
     setError(null);
+    setLinkedPerson(null);
     try {
       const data = await searchQuery(query.trim(), domain.trim() || undefined);
       setResult(data);
+
+      const linked = await findLinkedPerson({
+        email: data.enrichment.person.publicEmail,
+        domain: data.enrichment.company?.domain,
+        name: data.enrichment.person.name,
+      }).catch(() => null);
+      setLinkedPerson(linked);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Something went wrong");
       setResult(null);
@@ -85,7 +94,7 @@ function App() {
       {tab === "research" ? (
         <>
           {error && <div className="error-banner">{error}</div>}
-          {result && <ResultView result={result} />}
+          {result && <ResultView result={result} linkedPerson={linkedPerson} />}
           {!result && !error && !loading && (
             <p className="empty-state">
               Enter a name or company to generate a research profile, AI summary, and a draft
@@ -100,12 +109,26 @@ function App() {
   );
 }
 
-function ResultView({ result }: { result: ResearchResponse }) {
+function ResultView({
+  result,
+  linkedPerson,
+}: {
+  result: ResearchResponse;
+  linkedPerson: CrmPerson | null;
+}) {
   const { enrichment, aiSummary, outreachDraft } = result;
   const { person, company, sources } = enrichment;
 
   return (
     <div className="result">
+      {linkedPerson && (
+        <div className="linked-banner">
+          Already tracked from LinkedIn as <strong>{linkedPerson.name}</strong> — status:{" "}
+          <span className="badge badge-medium">{linkedPerson.status.replace("_", " ")}</span>,{" "}
+          {linkedPerson.followUpCount} follow-up{linkedPerson.followUpCount === 1 ? "" : "s"} so
+          far. Check the Queue tab for their existing thread before starting a new one here.
+        </div>
+      )}
       <section className="card">
         <h2>{person.name}</h2>
         {person.title && (
