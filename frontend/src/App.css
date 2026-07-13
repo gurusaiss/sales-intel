@@ -273,6 +273,30 @@ h1 {
   color: var(--muted);
 }
 
+.tech-stack {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  margin-top: 0.75rem;
+}
+
+.tech-category {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.6rem;
+}
+
+.tech-category-label {
+  font-size: 0.7rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--muted);
+  min-width: 5.5rem;
+  padding-top: 0.25rem;
+  flex-shrink: 0;
+}
+
 .signal-list ul {
   margin: 0.3rem 0 0;
   padding-left: 1.1rem;

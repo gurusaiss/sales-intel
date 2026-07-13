@@ -3,6 +3,7 @@ import { z } from "zod";
 import { getEnrichmentProvider } from "../services/enrichment";
 import { generateResearchOutput } from "../services/ai";
 import { fetchGrowthSignals } from "../services/newsSignals";
+import { detectTechStack, flattenTechStack } from "../services/techStack";
 import { ResearchResponse } from "../types";
 import { requireApiKey } from "../middleware/apiKey";
 
@@ -35,6 +36,19 @@ router.post("/search", requireApiKey, async (req, res) => {
       if (realSignals.length > 0) {
         enrichment.company.newsSignals = realSignals;
         enrichment.sources = [...enrichment.sources, "hacker-news"];
+      }
+
+      const companyDomain = domain ?? enrichment.company.domain;
+      if (companyDomain) {
+        const techStack = await detectTechStack(companyDomain);
+        if (techStack) {
+          enrichment.company.techStack = techStack;
+          const detected = flattenTechStack(techStack);
+          const existing = enrichment.company.technologies ?? [];
+          const merged = [...new Set([...existing, ...detected])];
+          if (merged.length > 0) enrichment.company.technologies = merged;
+          if (detected.length > 0) enrichment.sources = [...enrichment.sources, "tech-stack-detect"];
+        }
       }
     }
 

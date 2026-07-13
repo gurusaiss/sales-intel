@@ -201,6 +201,117 @@ async function handleLogout() {
   await loadPersons();
 }
 
+/**
+ * Reads visible contact info off whatever page is active when the user
+ * clicks this button in the popup. chrome.scripting.executeScript here runs
+ * under the "activeTab" grant, which Chrome only hands out for the tab the
+ * user is looking at *because* they just invoked the extension — the same
+ * one-click, user-initiated model as the LinkedIn/profile capture buttons,
+ * just generalized to any site instead of being limited to LinkedIn.
+ */
+async function captureCurrentPage() {
+  const statusEl = document.getElementById("capture-status");
+  statusEl.textContent = "Reading page…";
+
+  const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+  if (!tab?.id) {
+    statusEl.textContent = "No active tab.";
+    return;
+  }
+
+  let extracted;
+  try {
+    const [{ result }] = await chrome.scripting.executeScript({
+      target: { tabId: tab.id },
+      func: extractPageContactInfo,
+    });
+    extracted = result;
+  } catch (err) {
+    statusEl.textContent = "Couldn't read this page (it may be a restricted browser page).";
+    return;
+  }
+
+  document.getElementById("cap-name").value = extracted.name || "";
+  document.getElementById("cap-url").value = extracted.url || "";
+  document.getElementById("cap-role").value = extracted.role || "";
+  document.getElementById("cap-email").value = extracted.email || "";
+  document.getElementById("cap-phone").value = extracted.phone || "";
+  document.getElementById("capture-form").hidden = false;
+  statusEl.textContent = "Review and edit before saving.";
+}
+
+/**
+ * Runs INSIDE the target page (via chrome.scripting.executeScript), not in
+ * the extension itself — reads mailto:/tel: links and page metadata already
+ * visible on screen, the same information any visitor could read manually.
+ * No storage writes happen here; it only returns data back to the popup for
+ * the user to review.
+ */
+function extractPageContactInfo() {
+  const ogTitle = document.querySelector('meta[property="og:title"]')?.content ?? "";
+  const description =
+    document.querySelector('meta[name="description"]')?.content ??
+    document.querySelector('meta[property="og:description"]')?.content ??
+    "";
+
+  const name =
+    document.querySelector("h1")?.textContent?.trim() ||
+    ogTitle.split(/[-|]/)[0]?.trim() ||
+    document.title.split(/[-|]/)[0]?.trim() ||
+    "";
+
+  const email = document.querySelector('a[href^="mailto:"]')?.href.replace("mailto:", "") || "";
+  const phone = document.querySelector('a[href^="tel:"]')?.href.replace("tel:", "") || "";
+
+  return {
+    name,
+    url: window.location.href.split("?")[0],
+    role: description.slice(0, 140),
+    email,
+    phone,
+  };
+}
+
+async function saveCapturedPage() {
+  const statusEl = document.getElementById("capture-status");
+  const linkedinUrl = document.getElementById("cap-url").value.trim();
+  const name = document.getElementById("cap-name").value.trim();
+
+  if (!linkedinUrl || !name) {
+    statusEl.textContent = "Name and source URL are required.";
+    return;
+  }
+
+  const payload = {
+    linkedinUrl,
+    name,
+    role: document.getElementById("cap-role").value.trim() || undefined,
+    publicEmail: document.getElementById("cap-email").value.trim() || undefined,
+    phone: document.getElementById("cap-phone").value.trim() || undefined,
+  };
+
+  statusEl.textContent = "Saving…";
+  const headers = await authHeaders({ "content-type": "application/json" });
+  try {
+    const res = await fetch(`${API_BASE}/api/persons/capture`, {
+      method: "POST",
+      headers,
+      body: JSON.stringify(payload),
+    });
+    const data = await res.json();
+    if (!res.ok) {
+      statusEl.textContent = data.error || "Failed to save.";
+      return;
+    }
+    statusEl.textContent = "Saved to CRM.";
+    loadPersons();
+  } catch (err) {
+    statusEl.textContent = err.message || "Network error.";
+  }
+}
+
+document.getElementById("capture-page-btn").addEventListener("click", captureCurrentPage);
+document.getElementById("capture-save-btn").addEventListener("click", saveCapturedPage);
 document.getElementById("export-csv").addEventListener("click", () => exportPersons("csv"));
 document.getElementById("export-json").addEventListener("click", () => exportPersons("json"));
 document.getElementById("booking-save").addEventListener("click", saveBookingProfile);

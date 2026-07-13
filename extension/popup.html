@@ -29,6 +29,24 @@
     </section>
 
     <div id="nudge"></div>
+
+    <section id="page-capture">
+      <button id="capture-page-btn">Capture this page</button>
+      <p class="sub">
+        Reads visible contact info (name, email, phone) from the page you're currently on and
+        lets you review it before saving — works on any site, one click, nothing automatic.
+      </p>
+      <div id="capture-form" hidden>
+        <label>Name<input id="cap-name" type="text" /></label>
+        <label>Source URL<input id="cap-url" type="text" /></label>
+        <label>Company / title<input id="cap-role" type="text" /></label>
+        <label>Email<input id="cap-email" type="text" /></label>
+        <label>Phone<input id="cap-phone" type="text" /></label>
+        <button id="capture-save-btn">Save to CRM</button>
+        <span id="capture-status"></span>
+      </div>
+    </section>
+
     <div class="export-row">
       <button id="export-csv">Export CSV</button>
       <button id="export-json">Export JSON</button>

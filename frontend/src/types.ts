@@ -18,6 +18,16 @@ export interface CompanyInfo {
     investors?: string[];
   };
   technologies?: string[];
+  techStack?: {
+    frontend?: string[];
+    backend?: string[];
+    cms?: string[];
+    analytics?: string[];
+    marketing?: string[];
+    cdn?: string[];
+    hosting?: string[];
+    security?: string[];
+  };
   socials?: SocialLink[];
   newsSignals?: string[];
 }

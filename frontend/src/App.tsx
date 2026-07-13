@@ -221,7 +221,35 @@ function ResultView({
               />
             )}
           </div>
-          {company.technologies && company.technologies.length > 0 && (
+          {company.techStack && Object.values(company.techStack).some((v) => v && v.length > 0) ? (
+            <div className="tech-stack">
+              {(
+                [
+                  ["Frontend", company.techStack.frontend],
+                  ["Backend", company.techStack.backend],
+                  ["CMS", company.techStack.cms],
+                  ["Analytics", company.techStack.analytics],
+                  ["Marketing", company.techStack.marketing],
+                  ["CDN", company.techStack.cdn],
+                  ["Hosting", company.techStack.hosting],
+                  ["Security", company.techStack.security],
+                ] as [string, string[] | undefined][]
+              )
+                .filter(([, items]) => items && items.length > 0)
+                .map(([label, items]) => (
+                  <div className="tech-category" key={label}>
+                    <span className="tech-category-label">{label}</span>
+                    <div className="tag-row">
+                      {items!.map((t) => (
+                        <span className="tag" key={t}>
+                          {t}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                ))}
+            </div>
+          ) : company.technologies && company.technologies.length > 0 ? (
             <div className="tag-row">
               {company.technologies.map((t) => (
                 <span className="tag" key={t}>
@@ -229,7 +257,7 @@ function ResultView({
                 </span>
               ))}
             </div>
-          )}
+          ) : null}
           {company.socials && company.socials.length > 0 && <LinkRow links={company.socials} />}
           {company.newsSignals && company.newsSignals.length > 0 && (
             <SignalList title="Growth signals" items={company.newsSignals} />

@@ -49,16 +49,32 @@ export async function generateResearchOutput(enrichment: EnrichmentResult): Prom
   return parseModelOutput(text, enrichment);
 }
 
+function buildTechStackSection(enrichment: EnrichmentResult): string {
+  const ts = enrichment.company?.techStack;
+  if (!ts) return "";
+  const lines: string[] = [];
+  if (ts.frontend?.length)  lines.push(`  Frontend:   ${ts.frontend.join(", ")}`);
+  if (ts.backend?.length)   lines.push(`  Backend:    ${ts.backend.join(", ")}`);
+  if (ts.cms?.length)       lines.push(`  CMS:        ${ts.cms.join(", ")}`);
+  if (ts.analytics?.length) lines.push(`  Analytics:  ${ts.analytics.join(", ")}`);
+  if (ts.marketing?.length) lines.push(`  Marketing:  ${ts.marketing.join(", ")}`);
+  if (ts.cdn?.length)       lines.push(`  CDN:        ${ts.cdn.join(", ")}`);
+  if (ts.hosting?.length)   lines.push(`  Hosting:    ${ts.hosting.join(", ")}`);
+  if (ts.security?.length)  lines.push(`  Security:   ${ts.security.join(", ")}`);
+  if (!lines.length) return "";
+  return `\nDETECTED TECH STACK (live scan of their website):\n${lines.join("\n")}\n`;
+}
+
 function buildPrompt(enrichment: EnrichmentResult): string {
   return `You are a sales research assistant. Given this public business information, produce:
 1. A 3-sentence summary of who this person is and why they're relevant to a sales/business outreach.
-2. A personalized outreach email (subject + body, under 120 words) referencing a specific real signal from the data (not generic).
+2. A personalized outreach email (subject + body, under 120 words) referencing a specific real signal from the data (not generic). If a tech stack is provided, mention one specific technology they use to show you've done your homework.
 
 Respond in this exact format:
 SUMMARY: <summary>
 SUBJECT: <subject line>
 BODY: <email body>
-
+${buildTechStackSection(enrichment)}
 DATA:
 ${JSON.stringify(enrichment, null, 2)}`;
 }
