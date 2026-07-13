@@ -123,6 +123,7 @@ export async function mergePersons(
     companyDomain: keep.companyDomain ?? merge.companyDomain,
     publicEmail: keep.publicEmail ?? merge.publicEmail,
     emailConfidence: keep.emailConfidence ?? merge.emailConfidence,
+    phone: keep.phone ?? merge.phone,
     contactPageUrl: keep.contactPageUrl ?? merge.contactPageUrl,
     bookingUrl: keep.bookingUrl ?? merge.bookingUrl,
     lastContactedAt: laterOf(keep.lastContactedAt, merge.lastContactedAt),
@@ -178,6 +179,11 @@ export async function captureOrUpdatePerson(input: CapturePersonInput): Promise<
   person.company = input.company ?? person.company;
   person.role = input.role ?? person.role;
   person.location = input.location ?? person.location;
+  person.publicEmail = input.publicEmail ?? person.publicEmail;
+  person.phone = input.phone ?? person.phone;
+  if (input.publicEmail && !person.emailConfidence) {
+    person.emailConfidence = "high"; // came straight off their own LinkedIn profile
+  }
   person.updatedAt = now;
 
   if (input.visibleMessage) {

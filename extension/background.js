@@ -67,6 +67,18 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
     return true;
   }
 
+  if (message.type === "CAPTURE_PROFILE") {
+    forwardResponse(
+      fetch(`${API_BASE}/api/persons/capture`, {
+        method: "POST",
+        headers: authHeaders({ "content-type": "application/json" }),
+        body: JSON.stringify(message.payload),
+      }),
+      sendResponse
+    );
+    return true;
+  }
+
   if (message.type === "PATCH_PERSON") {
     const encodedUrl = encodeURIComponent(message.linkedinUrl);
     forwardResponse(

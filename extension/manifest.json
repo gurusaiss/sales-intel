@@ -20,6 +20,12 @@
       "run_at": "document_idle"
     },
     {
+      "matches": ["https://www.linkedin.com/in/*"],
+      "js": ["profile.js"],
+      "css": ["content.css"],
+      "run_at": "document_idle"
+    },
+    {
       "matches": [
         "https://calendly.com/*",
         "https://*.calendly.com/*",

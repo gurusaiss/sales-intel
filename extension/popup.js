@@ -26,6 +26,7 @@ async function loadPersons() {
         <span class="name">${escapeHtml(p.name)}</span>
         <span class="meta">${escapeHtml(p.role || "")}${p.company ? " · " + escapeHtml(p.company) : ""}</span>
         <span class="meta">Follow-ups: ${p.followUpCount} · Template: ${p.templateCategory}</span>
+        ${p.publicEmail || p.phone ? `<span class="meta">${escapeHtml(p.publicEmail || "")}${p.publicEmail && p.phone ? " · " : ""}${escapeHtml(p.phone || "")}</span>` : ""}
         <span class="status-pill">${p.status.replace("_", " ")}</span>
       </div>
     `

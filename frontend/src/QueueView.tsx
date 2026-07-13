@@ -133,7 +133,8 @@ export default function QueueView() {
                 </div>
                 <p className="queue-context">
                   Follow-ups so far: {person.followUpCount}
-                  {person.publicEmail ? ` · Public email on file: ${person.publicEmail}` : ""}
+                  {person.publicEmail ? ` · Email: ${person.publicEmail}` : ""}
+                  {person.phone ? ` · Phone: ${person.phone}` : ""}
                 </p>
                 <pre className="draft-body">{draft}</pre>
                 <div className="queue-actions">

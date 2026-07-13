@@ -44,6 +44,8 @@ const captureSchema = z.object({
   company: z.string().trim().optional(),
   role: z.string().trim().optional(),
   location: z.string().trim().optional(),
+  publicEmail: z.string().trim().email().optional().or(z.literal("")),
+  phone: z.string().trim().optional(),
   visibleMessage: visibleMessageSchema.optional(),
 });
 

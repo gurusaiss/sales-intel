@@ -76,6 +76,7 @@ export interface CrmPerson {
   followUpCount: number;
   status: ContactStatus;
   publicEmail?: string;
+  phone?: string;
   updatedAt: string;
 }
 

@@ -56,6 +56,7 @@ export interface CrmPerson {
   companyDomain?: string;
   publicEmail?: string;
   emailConfidence?: "high" | "medium" | "low" | "unverified";
+  phone?: string;
   bookingUrl?: string;
   contactPageUrl?: string;
 
@@ -72,6 +73,8 @@ export interface CapturePersonInput {
   company?: string;
   role?: string;
   location?: string;
+  publicEmail?: string;
+  phone?: string;
   visibleMessage?: {
     direction: "outbound" | "inbound";
     text: string;
