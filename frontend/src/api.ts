@@ -1,6 +1,14 @@
 import type { ResearchResponse, QueueResponse, ContactStatus, CrmPerson } from "./types";
 
 const API_BASE = import.meta.env.VITE_API_BASE ?? "http://localhost:4000";
+const API_KEY = import.meta.env.VITE_APP_API_KEY;
+
+function authHeaders(extra?: Record<string, string>): Record<string, string> {
+  return {
+    ...(API_KEY ? { "x-api-key": API_KEY } : {}),
+    ...extra,
+  };
+}
 
 async function handleResponse<T>(res: Response): Promise<T> {
   if (!res.ok) {
@@ -13,14 +21,14 @@ async function handleResponse<T>(res: Response): Promise<T> {
 export async function searchQuery(query: string, domain?: string): Promise<ResearchResponse> {
   const res = await fetch(`${API_BASE}/api/search`, {
     method: "POST",
-    headers: { "content-type": "application/json" },
+    headers: authHeaders({ "content-type": "application/json" }),
     body: JSON.stringify({ query, domain }),
   });
   return handleResponse(res);
 }
 
 export async function fetchQueue(limit = 15): Promise<QueueResponse> {
-  const res = await fetch(`${API_BASE}/api/queue?limit=${limit}`);
+  const res = await fetch(`${API_BASE}/api/queue?limit=${limit}`, { headers: authHeaders() });
   return handleResponse(res);
 }
 
@@ -30,7 +38,7 @@ export async function updatePersonStatus(
 ): Promise<void> {
   const res = await fetch(`${API_BASE}/api/persons/${encodeURIComponent(linkedinUrl)}`, {
     method: "PATCH",
-    headers: { "content-type": "application/json" },
+    headers: authHeaders({ "content-type": "application/json" }),
     body: JSON.stringify({ status }),
   });
   await handleResponse(res);
@@ -60,7 +68,9 @@ export async function findLinkedPerson(params: {
   if (params.domain) query.set("domain", params.domain);
   if (params.name) query.set("name", params.name);
 
-  const res = await fetch(`${API_BASE}/api/persons/lookup?${query.toString()}`);
+  const res = await fetch(`${API_BASE}/api/persons/lookup?${query.toString()}`, {
+    headers: authHeaders(),
+  });
   const data = await handleResponse<{ person: CrmPerson | null }>(res);
   return data.person;
 }
@@ -73,7 +83,7 @@ export async function sendViaGmail(
 ): Promise<void> {
   const res = await fetch(`${API_BASE}/api/send-email`, {
     method: "POST",
-    headers: { "content-type": "application/json" },
+    headers: authHeaders({ "content-type": "application/json" }),
     body: JSON.stringify({ to, subject, body, linkedinUrl }),
   });
   await handleResponse(res);

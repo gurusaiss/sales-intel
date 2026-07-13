@@ -3,6 +3,7 @@ import { z } from "zod";
 import { getEnrichmentProvider } from "../services/enrichment";
 import { generateResearchOutput } from "../services/ai";
 import { ResearchResponse } from "../types";
+import { requireApiKey } from "../middleware/apiKey";
 
 const router = Router();
 
@@ -16,7 +17,7 @@ const searchSchema = z.object({
     .or(z.literal("")),
 });
 
-router.post("/search", async (req, res) => {
+router.post("/search", requireApiKey, async (req, res) => {
   const parsed = searchSchema.safeParse(req.body);
   if (!parsed.success) {
     return res.status(400).json({ error: parsed.error.issues[0]?.message ?? "Invalid request" });

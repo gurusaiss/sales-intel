@@ -11,6 +11,7 @@ import { generateFollowUpDraft, generateChannelSwitchEmail } from "../services/a
 import { matchTemplateCategory } from "../services/templates";
 import { getEnrichmentProvider } from "../services/enrichment";
 import { scanCompanySite } from "../services/siteScanner";
+import { requireApiKey } from "../middleware/apiKey";
 
 const router = Router();
 
@@ -28,7 +29,7 @@ const captureSchema = z.object({
   visibleMessage: visibleMessageSchema.optional(),
 });
 
-router.get("/persons", async (_req, res) => {
+router.get("/persons", requireApiKey, async (_req, res) => {
   const persons = await listPersons();
   res.json({ persons });
 });
@@ -39,7 +40,7 @@ router.get("/persons", async (_req, res) => {
  * registered before the /:linkedinUrl route below or Express will treat
  * "lookup" as a linkedinUrl param.
  */
-router.get("/persons/lookup", async (req, res) => {
+router.get("/persons/lookup", requireApiKey, async (req, res) => {
   const { email, domain, name } = req.query;
   const match = await findPersonByIdentity({
     email: typeof email === "string" ? email : undefined,
@@ -49,13 +50,13 @@ router.get("/persons/lookup", async (req, res) => {
   res.json({ person: match ?? null });
 });
 
-router.get("/persons/:linkedinUrl", async (req, res) => {
+router.get("/persons/:linkedinUrl", requireApiKey, async (req, res) => {
   const person = await getPerson(decodeURIComponent(req.params.linkedinUrl));
   if (!person) return res.status(404).json({ error: "Person not found" });
   res.json({ person });
 });
 
-router.post("/persons/capture", async (req, res) => {
+router.post("/persons/capture", requireApiKey, async (req, res) => {
   const parsed = captureSchema.safeParse(req.body);
   if (!parsed.success) {
     return res.status(400).json({ error: parsed.error.issues[0]?.message ?? "Invalid request" });
@@ -82,7 +83,7 @@ const patchSchema = z.object({
     .optional(),
 });
 
-router.patch("/persons/:linkedinUrl", async (req, res) => {
+router.patch("/persons/:linkedinUrl", requireApiKey, async (req, res) => {
   const parsed = patchSchema.safeParse(req.body);
   if (!parsed.success) {
     return res.status(400).json({ error: parsed.error.issues[0]?.message ?? "Invalid request" });
@@ -99,7 +100,7 @@ const draftSchema = captureSchema.extend({
     .optional(),
 });
 
-router.post("/draft", async (req, res) => {
+router.post("/draft", requireApiKey, async (req, res) => {
   const parsed = draftSchema.safeParse(req.body);
   if (!parsed.success) {
     return res.status(400).json({ error: parsed.error.issues[0]?.message ?? "Invalid request" });
@@ -145,7 +146,7 @@ const escalateSchema = z.object({
  * find — and recommends the next channel instead of guessing or scraping
  * anything not already public.
  */
-router.post("/persons/:linkedinUrl/escalate", async (req, res) => {
+router.post("/persons/:linkedinUrl/escalate", requireApiKey, async (req, res) => {
   const parsed = escalateSchema.safeParse(req.body);
   if (!parsed.success) {
     return res.status(400).json({ error: parsed.error.issues[0]?.message ?? "Invalid request" });
@@ -211,8 +212,9 @@ router.post("/persons/:linkedinUrl/escalate", async (req, res) => {
  * opening each LinkedIn thread one at a time. Still zero auto-send — this
  * only prepares text, nothing here ever touches LinkedIn or an inbox.
  */
-router.get("/queue", async (req, res) => {
-  const limit = Math.min(Number(req.query.limit) || 15, 30);
+router.get("/queue", requireApiKey, async (req, res) => {
+  const requested = Number(req.query.limit);
+  const limit = Math.min(Math.max(Number.isFinite(requested) && requested > 0 ? requested : 15, 1), 30);
 
   try {
     const all = await listPersons();

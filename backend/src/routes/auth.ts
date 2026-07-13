@@ -9,6 +9,7 @@ import {
 } from "../services/gmail";
 import { clearTokens } from "../services/googleAuthStore";
 import { getPerson, updatePerson } from "../services/personStore";
+import { requireApiKey } from "../middleware/apiKey";
 
 const router = Router();
 
@@ -42,7 +43,7 @@ router.get("/auth/google/status", async (_req, res) => {
   res.json({ configured: isConfigured(), connected: await isConnected() });
 });
 
-router.post("/auth/google/disconnect", async (_req, res) => {
+router.post("/auth/google/disconnect", requireApiKey, async (_req, res) => {
   await clearTokens();
   res.json({ connected: false });
 });
@@ -60,7 +61,7 @@ const sendEmailSchema = z.object({
  * manual click from the queue view — never triggered on a timer or in bulk
  * without a click per email.
  */
-router.post("/send-email", async (req, res) => {
+router.post("/send-email", requireApiKey, async (req, res) => {
   const parsed = sendEmailSchema.safeParse(req.body);
   if (!parsed.success) {
     return res.status(400).json({ error: parsed.error.issues[0]?.message ?? "Invalid request" });

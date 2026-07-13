@@ -23,6 +23,8 @@ services:
         sync: false
       - key: GOOGLE_REDIRECT_URI
         value: https://sales-intel-backend-ctvc.onrender.com/api/auth/google/callback
+      - key: APP_API_KEY
+        sync: false
 
   - type: web
     name: sales-intel-frontend
@@ -33,3 +35,5 @@ services:
     envVars:
       - key: VITE_API_BASE
         value: https://sales-intel-backend-ctvc.onrender.com
+      - key: VITE_APP_API_KEY
+        sync: false

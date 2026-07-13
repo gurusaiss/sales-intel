@@ -7,7 +7,9 @@ async function loadPersons() {
   const nudgeEl = document.getElementById("nudge");
   const listEl = document.getElementById("list");
   try {
-    const res = await fetch(`${API_BASE}/api/persons`);
+    const res = await fetch(`${API_BASE}/api/persons`, {
+      headers: API_KEY ? { "x-api-key": API_KEY } : {},
+    });
     const { persons } = await res.json();
 
     renderNudge(nudgeEl, persons);

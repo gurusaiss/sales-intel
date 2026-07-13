@@ -34,12 +34,12 @@ export async function scanCompanySite(website: string): Promise<SiteScanResult> 
     const hrefs = extractHrefs(html);
     const base = new URL(website);
 
-    const bookingUrl = hrefs.find((href) => BOOKING_DOMAINS.some((d) => href.includes(d)));
+    const bookingHref = hrefs.find((href) => BOOKING_DOMAINS.some((d) => href.includes(d)));
     const contactHref = hrefs.find((href) => /contact/i.test(href));
 
     return {
-      bookingUrl,
-      contactPageUrl: contactHref ? resolveUrl(contactHref, base) : undefined,
+      bookingUrl: bookingHref ? resolveSafeUrl(bookingHref, base) : undefined,
+      contactPageUrl: contactHref ? resolveSafeUrl(contactHref, base) : undefined,
     };
   } catch (err) {
     console.error("Site scan failed", err);
@@ -52,10 +52,18 @@ function extractHrefs(html: string): string[] {
   return Array.from(matches, (m) => m[1]);
 }
 
-function resolveUrl(href: string, base: URL): string {
+/**
+ * Resolves a scraped href against the page's own base URL and rejects
+ * anything that isn't http/https — a hostile page could otherwise plant a
+ * `javascript:` link that later renders as a clickable link in the
+ * extension's panel.
+ */
+function resolveSafeUrl(href: string, base: URL): string | undefined {
   try {
-    return new URL(href, base).toString();
+    const resolved = new URL(href, base);
+    if (resolved.protocol !== "http:" && resolved.protocol !== "https:") return undefined;
+    return resolved.toString();
   } catch {
-    return href;
+    return undefined;
   }
 }

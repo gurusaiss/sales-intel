@@ -12,6 +12,11 @@ app.use(cors());
 app.use(express.json());
 
 app.get("/health", (_req, res) => res.json({ status: "ok" }));
+// requireApiKey is applied per-route inside each router file, not here —
+// mounting it at the "/api" prefix would intercept every /api/* request
+// before Express even checks which router (or which route within a router)
+// actually matches, which would also block routes meant to stay public
+// (like /auth/google/status).
 app.use("/api", searchRouter);
 app.use("/api", crmRouter);
 app.use("/api", authRouter);
