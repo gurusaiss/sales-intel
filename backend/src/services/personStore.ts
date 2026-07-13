@@ -1,28 +1,13 @@
-import { promises as fs } from "fs";
-import path from "path";
 import { CrmPerson, CapturePersonInput } from "../types/crm";
 import { matchTemplateCategory } from "./templates";
-
-const DATA_DIR = path.join(__dirname, "..", "..", "data");
-const DATA_FILE = path.join(DATA_DIR, "persons.json");
-
-async function ensureStore(): Promise<void> {
-  await fs.mkdir(DATA_DIR, { recursive: true });
-  try {
-    await fs.access(DATA_FILE);
-  } catch {
-    await fs.writeFile(DATA_FILE, "{}", "utf-8");
-  }
-}
+import { readJson, writeJson } from "./kvStore";
 
 async function readAll(): Promise<Record<string, CrmPerson>> {
-  await ensureStore();
-  const raw = await fs.readFile(DATA_FILE, "utf-8");
-  return JSON.parse(raw || "{}");
+  return readJson<Record<string, CrmPerson>>("persons", {});
 }
 
 async function writeAll(data: Record<string, CrmPerson>): Promise<void> {
-  await fs.writeFile(DATA_FILE, JSON.stringify(data, null, 2), "utf-8");
+  await writeJson("persons", data);
 }
 
 export function idFromUrl(linkedinUrl: string): string {

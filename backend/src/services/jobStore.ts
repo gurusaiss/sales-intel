@@ -1,27 +1,12 @@
-import { promises as fs } from "fs";
-import path from "path";
 import { JobApplication, AddJobInput, JobStatus } from "../types/jobs";
-
-const DATA_DIR = path.join(__dirname, "..", "..", "data");
-const DATA_FILE = path.join(DATA_DIR, "jobs.json");
-
-async function ensureStore(): Promise<void> {
-  await fs.mkdir(DATA_DIR, { recursive: true });
-  try {
-    await fs.access(DATA_FILE);
-  } catch {
-    await fs.writeFile(DATA_FILE, "{}", "utf-8");
-  }
-}
+import { readJson, writeJson } from "./kvStore";
 
 async function readAll(): Promise<Record<string, JobApplication>> {
-  await ensureStore();
-  const raw = await fs.readFile(DATA_FILE, "utf-8");
-  return JSON.parse(raw || "{}");
+  return readJson<Record<string, JobApplication>>("jobs", {});
 }
 
 async function writeAll(data: Record<string, JobApplication>): Promise<void> {
-  await fs.writeFile(DATA_FILE, JSON.stringify(data, null, 2), "utf-8");
+  await writeJson("jobs", data);
 }
 
 function generateId(company: string, role: string): string {

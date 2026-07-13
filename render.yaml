@@ -25,6 +25,10 @@ services:
         value: https://sales-intel-backend-ctvc.onrender.com/api/auth/google/callback
       - key: APP_API_KEY
         sync: false
+      - key: UPSTASH_REDIS_REST_URL
+        sync: false
+      - key: UPSTASH_REDIS_REST_TOKEN
+        sync: false
 
   - type: web
     name: sales-intel-frontend
