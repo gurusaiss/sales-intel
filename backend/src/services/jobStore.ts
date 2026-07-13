@@ -34,6 +34,7 @@ export async function addJob(userId: string, input: AddJobInput): Promise<JobApp
     status: "saved",
     referralContactName: input.referralContactName,
     referralContactEmail: input.referralContactEmail,
+    referralPersonLinkedinUrl: input.referralPersonLinkedinUrl,
     notes: "",
     createdAt: now,
     updatedAt: now,
@@ -47,7 +48,12 @@ export async function addJob(userId: string, input: AddJobInput): Promise<JobApp
 export async function updateJob(
   userId: string,
   id: string,
-  patch: Partial<Pick<JobApplication, "status" | "notes" | "appliedDate" | "referralContactName" | "referralContactEmail">>
+  patch: Partial<
+    Pick<
+      JobApplication,
+      "status" | "notes" | "appliedDate" | "referralContactName" | "referralContactEmail" | "referralPersonLinkedinUrl"
+    >
+  >
 ): Promise<JobApplication | undefined> {
   const all = await readAll(userId);
   const existing = all[id];

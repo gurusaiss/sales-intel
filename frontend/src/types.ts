@@ -72,6 +72,7 @@ export interface CrmPerson {
   company?: string;
   role?: string;
   templateCategory: TemplateCategory;
+  tags: string[];
   priority: number;
   followUpCount: number;
   status: ContactStatus;

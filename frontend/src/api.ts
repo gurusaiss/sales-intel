@@ -161,6 +161,44 @@ export async function addNote(linkedinUrl: string, text: string): Promise<CrmPer
   return data.person;
 }
 
+export async function updatePersonTags(linkedinUrl: string, tags: string[]): Promise<CrmPerson> {
+  const res = await fetch(`${API_BASE}/api/persons/${encodeURIComponent(linkedinUrl)}`, {
+    method: "PATCH",
+    headers: authHeaders({ "content-type": "application/json" }),
+    body: JSON.stringify({ tags }),
+  });
+  const data = await handleResponse<{ person: CrmPerson }>(res);
+  return data.person;
+}
+
+export interface LeadScoreResult {
+  score: number;
+  reasoning: string;
+}
+
+export async function scorePerson(linkedinUrl: string): Promise<LeadScoreResult> {
+  const res = await fetch(`${API_BASE}/api/persons/${encodeURIComponent(linkedinUrl)}/score`, {
+    headers: authHeaders(),
+  });
+  return handleResponse(res);
+}
+
+export interface AuditEntry {
+  action: string;
+  detail: string;
+  at: string;
+}
+
+export async function fetchAuditLog(): Promise<AuditEntry[]> {
+  const res = await fetch(`${API_BASE}/api/audit`, { headers: authHeaders() });
+  const data = await handleResponse<{ entries: AuditEntry[] }>(res);
+  return data.entries;
+}
+
+export function downloadAllExport(format: "csv" | "json"): Promise<void> {
+  return downloadExport(`/api/export/all?format=${format}`, `all-contacts.${format}`);
+}
+
 export async function logMeeting(
   linkedinUrl: string,
   date: string,
@@ -379,10 +417,31 @@ export interface JobApplication {
   status: JobStatus;
   referralContactName?: string;
   referralContactEmail?: string;
+  referralPersonLinkedinUrl?: string;
   appliedDate?: string;
   notes: string;
   createdAt: string;
   updatedAt: string;
+}
+
+export async function linkJobReferral(jobId: string, linkedinUrl: string): Promise<JobApplication> {
+  const res = await fetch(`${API_BASE}/api/jobs/${encodeURIComponent(jobId)}/link-referral`, {
+    method: "POST",
+    headers: authHeaders({ "content-type": "application/json" }),
+    body: JSON.stringify({ linkedinUrl }),
+  });
+  const data = await handleResponse<{ job: JobApplication }>(res);
+  return data.job;
+}
+
+export async function optimizeResumeText(targetRole?: string): Promise<string> {
+  const res = await fetch(`${API_BASE}/api/resume/optimize`, {
+    method: "POST",
+    headers: authHeaders({ "content-type": "application/json" }),
+    body: JSON.stringify({ targetRole }),
+  });
+  const data = await handleResponse<{ optimized: string }>(res);
+  return data.optimized;
 }
 
 export async function fetchJobs(): Promise<JobApplication[]> {

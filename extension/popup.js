@@ -70,6 +70,33 @@ function renderNudge(nudgeEl, persons) {
 
   const names = recentlyReplied.map((p) => escapeHtml(p.name)).join(", ");
   nudgeEl.innerHTML = `<div class="nudge-banner">${recentlyReplied.length} replied in the last 3 days: ${names}</div>`;
+  maybeNotifyReplies(recentlyReplied);
+}
+
+/**
+ * Fires a real OS notification the moment the popup opens and finds fresh
+ * replies — still zero background polling, it only runs inside this
+ * user-initiated popup load. Dedupes per person via chrome.storage.local so
+ * reopening the popup repeatedly doesn't re-notify for the same reply.
+ */
+async function maybeNotifyReplies(recentlyReplied) {
+  if (!chrome.notifications) return;
+  const { notifiedReplyIds = [] } = await new Promise((resolve) =>
+    chrome.storage.local.get(["notifiedReplyIds"], resolve)
+  );
+  const fresh = recentlyReplied.filter((p) => !notifiedReplyIds.includes(p.id));
+  if (fresh.length === 0) return;
+
+  chrome.notifications.create(`reply-nudge-${Date.now()}`, {
+    type: "basic",
+    iconUrl: "icon128.png",
+    title: fresh.length === 1 ? `${fresh[0].name} replied` : `${fresh.length} people replied recently`,
+    message: fresh.map((p) => p.name).join(", "),
+  });
+
+  chrome.storage.local.set({
+    notifiedReplyIds: [...notifiedReplyIds, ...fresh.map((p) => p.id)].slice(-200),
+  });
 }
 
 function escapeHtml(s) {

@@ -14,6 +14,9 @@ import { matchTemplateCategory } from "../services/templates";
 import { getEnrichmentProvider } from "../services/enrichment";
 import { scanCompanySite } from "../services/siteScanner";
 import { requireApiKey } from "../middleware/apiKey";
+import { logAction } from "../services/auditLog";
+import { scoreLead } from "../services/leadScoring";
+import { listLeads } from "../services/leadStore";
 
 const router = Router();
 
@@ -117,6 +120,55 @@ router.get("/persons/export", requireApiKey, async (req, res) => {
   res.send(csv);
 });
 
+/**
+ * Unified export: combines LinkedIn-tracked persons and company-search leads
+ * into a single file, since the two stores previously required separate
+ * exports even though they're both "contacts I'm tracking."
+ */
+router.get("/export/all", requireApiKey, async (req, res) => {
+  const format = (req.query.format as string) || "json";
+  const [persons, leads] = await Promise.all([listPersons(req.userId), listLeads(req.userId)]);
+
+  if (format === "csv") {
+    const columns = ["source", "name", "company", "role", "email", "status", "tags"] as const;
+    const rows = [
+      ...persons.map((p) =>
+        [
+          "linkedin",
+          p.name,
+          p.company ?? "",
+          p.role ?? "",
+          p.publicEmail ?? "",
+          p.status,
+          p.tags.join(";"),
+        ]
+          .map((v) => csvEscape(String(v)))
+          .join(",")
+      ),
+      ...leads.map((l) =>
+        [
+          "company-search",
+          l.name,
+          l.company ?? "",
+          l.title ?? "",
+          l.publicEmail ?? "",
+          l.status,
+          l.tags.join(";"),
+        ]
+          .map((v) => csvEscape(String(v)))
+          .join(",")
+      ),
+    ];
+    const csv = [columns.join(","), ...rows].join("\r\n");
+    res.setHeader("Content-Type", "text/csv");
+    res.setHeader("Content-Disposition", "attachment; filename=all-contacts.csv");
+    return res.send(csv);
+  }
+
+  res.setHeader("Content-Disposition", "attachment; filename=all-contacts.json");
+  res.json({ persons, leads });
+});
+
 function csvEscape(value: string): string {
   if (/[",\r\n]/.test(value)) {
     return `"${value.replace(/"/g, '""')}"`;
@@ -138,10 +190,31 @@ router.post("/persons/capture", requireApiKey, async (req, res) => {
 
   try {
     const person = await captureOrUpdatePerson(req.userId, parsed.data);
+    await logAction(req.userId, "person_captured", `Captured/updated ${person.name} (${person.linkedinUrl})`);
     res.json({ person });
   } catch (err) {
     console.error("Capture failed", err);
     res.status(500).json({ error: "Failed to capture person." });
+  }
+});
+
+/**
+ * AI Lead Scoring: rule-based signals (priority, status, recency, email
+ * confidence) always compute; Groq adds a one-line reasoning when configured.
+ * Distinct from the reply-rate-by-template analytics — this scores one
+ * specific person, not an aggregate.
+ */
+router.get("/persons/:linkedinUrl/score", requireApiKey, async (req, res) => {
+  const linkedinUrl = decodeURIComponent(req.params.linkedinUrl);
+  const person = await getPerson(req.userId, linkedinUrl);
+  if (!person) return res.status(404).json({ error: "Person not found" });
+
+  try {
+    const result = await scoreLead(person);
+    res.json(result);
+  } catch (err) {
+    console.error("Lead scoring failed", err);
+    res.status(500).json({ error: "Failed to score lead." });
   }
 });
 
@@ -285,6 +358,7 @@ router.post("/persons/merge", requireApiKey, async (req, res) => {
   if (!merged) {
     return res.status(404).json({ error: "One or both persons not found, or same person given twice." });
   }
+  await logAction(req.userId, "persons_merged", `Merged ${parsed.data.mergeLinkedinUrl} into ${parsed.data.keepLinkedinUrl}`);
   res.json({ person: merged });
 });
 
@@ -352,6 +426,7 @@ router.post("/persons/:linkedinUrl/escalate", requireApiKey, async (req, res) =>
         ? await generateChannelSwitchEmail(updated, publicEmail)
         : undefined;
 
+    await logAction(req.userId, "escalated", `Escalated ${person.name} — result: ${suggestedAction}`);
     res.json({ person: updated, suggestedAction, contactPageUrl, bookingUrl, emailDraft });
   } catch (err) {
     console.error("Escalation failed", err);

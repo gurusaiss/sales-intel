@@ -88,3 +88,20 @@ Output ONLY the cover letter body text, no subject line, no "Dear Hiring Manager
     `Dear Hiring Team at ${company},\n\nI'm interested in the ${role} position. [Connect GROQ_API_KEY for a real, personalized cover letter grounded in your resume and this job description.]\n\nBest,\n[Your name]`
   );
 }
+
+export async function optimizeResume(resumeText: string, targetRole?: string): Promise<string> {
+  const prompt = `Rewrite and improve this resume for clarity, impact, and ATS-friendliness. Keep every real fact (companies, dates, titles, metrics) unchanged — only improve wording, structure, and quantify achievements where the original already implies a number. Do not invent experience.${
+    targetRole ? `\n\nOptimize phrasing toward this target role: ${targetRole}` : ""
+  }
+
+RESUME:
+${resumeText}
+
+Output ONLY the rewritten resume text.`;
+
+  const text = await callGroq(prompt, 900);
+  return (
+    text ||
+    `[Connect GROQ_API_KEY to get a real AI-rewritten version of your resume.]\n\n${resumeText}`
+  );
+}

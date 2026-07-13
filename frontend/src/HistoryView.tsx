@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo } from "react";
-import { fetchAllPersons } from "./api";
+import { fetchAllPersons, fetchAuditLog, type AuditEntry } from "./api";
 import type { CrmPerson } from "./types";
 
 type DateRange = "today" | "yesterday" | "7days" | "30days" | "all";
@@ -41,6 +41,8 @@ export default function HistoryView() {
   const [range, setRange] = useState<DateRange>("all");
   const [search, setSearch] = useState("");
   const [sortKey, setSortKey] = useState<SortKey>("recent");
+  const [auditLog, setAuditLog] = useState<AuditEntry[]>([]);
+  const [showAudit, setShowAudit] = useState(false);
 
   useEffect(() => {
     fetchAllPersons()
@@ -48,6 +50,15 @@ export default function HistoryView() {
       .catch((err) => setError(err instanceof Error ? err.message : "Failed to load history"))
       .finally(() => setLoading(false));
   }, []);
+
+  async function handleToggleAudit() {
+    if (!showAudit && auditLog.length === 0) {
+      fetchAuditLog()
+        .then(setAuditLog)
+        .catch(() => {});
+    }
+    setShowAudit((current) => !current);
+  }
 
   const filtered = useMemo(() => {
     const searchLower = search.trim().toLowerCase();
@@ -104,8 +115,29 @@ export default function HistoryView() {
       </div>
 
       <p className="queue-meta" style={{ marginTop: "0.5rem" }}>
-        {filtered.length} of {persons.length} total captured contacts.
+        {filtered.length} of {persons.length} total captured contacts.{" "}
+        <button className="ghost-button" style={{ marginLeft: "0.5rem" }} onClick={handleToggleAudit}>
+          {showAudit ? "Hide audit log" : "Show audit log"}
+        </button>
       </p>
+
+      {showAudit && (
+        <div className="card" style={{ marginBottom: "0.75rem" }}>
+          <span className="card-label">Audit log (last {auditLog.length} actions)</span>
+          {auditLog.length === 0 ? (
+            <p className="subline">No recorded actions yet.</p>
+          ) : (
+            <ul style={{ margin: "0.4rem 0 0", paddingLeft: "1.1rem", fontSize: "0.82rem" }}>
+              {auditLog.map((entry, i) => (
+                <li key={i}>
+                  <span className="badge badge-medium">{entry.action}</span> {entry.detail} —{" "}
+                  {new Date(entry.at).toLocaleString()}
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+      )}
 
       {filtered.length === 0 ? (
         <p className="empty-state">No contacts match this range/search.</p>

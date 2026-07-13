@@ -7,7 +7,9 @@ import authRouter from "./routes/auth";
 import leadsRouter from "./routes/leads";
 import careerRouter from "./routes/career";
 import usersRouter from "./routes/users";
+import auditRouter from "./routes/audit";
 import { resolveUser } from "./middleware/auth";
+import { rateLimit } from "./middleware/rateLimit";
 
 const app = express();
 const PORT = process.env.PORT ? Number(process.env.PORT) : 4000;
@@ -21,13 +23,17 @@ app.get("/health", (_req, res) => res.json({ status: "ok" }));
 // so mounting it globally is safe. requireApiKey stays per-route inside each
 // router file since it DOES block, and mounting a blocking middleware at the
 // "/api" prefix previously broke unrelated public routes (see git history).
+// rateLimit is also non-blocking except when the window is exceeded (429),
+// so it's safe to mount globally the same way.
 app.use("/api", resolveUser);
+app.use("/api", rateLimit);
 app.use("/api", searchRouter);
 app.use("/api", crmRouter);
 app.use("/api", authRouter);
 app.use("/api", leadsRouter);
 app.use("/api", careerRouter);
 app.use("/api", usersRouter);
+app.use("/api", auditRouter);
 
 app.listen(PORT, () => {
   console.log(`Backend listening on http://localhost:${PORT}`);

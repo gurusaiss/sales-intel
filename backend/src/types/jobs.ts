@@ -8,6 +8,7 @@ export interface JobApplication {
   status: JobStatus;
   referralContactName?: string;
   referralContactEmail?: string;
+  referralPersonLinkedinUrl?: string;
   appliedDate?: string;
   notes: string;
   createdAt: string;
@@ -20,4 +21,5 @@ export interface AddJobInput {
   jobDescription?: string;
   referralContactName?: string;
   referralContactEmail?: string;
+  referralPersonLinkedinUrl?: string;
 }

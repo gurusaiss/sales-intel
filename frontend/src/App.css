@@ -506,6 +506,20 @@ h1 {
   min-width: 640px;
 }
 
+.lead-row.jobs-row {
+  grid-template-columns: 24px 1fr 1fr 0.9fr 1.3fr 0.7fr;
+}
+
+.tag-remove {
+  background: none;
+  border: none;
+  color: inherit;
+  cursor: pointer;
+  padding: 0 0 0 0.15rem;
+  font-size: 0.85rem;
+  line-height: 1;
+}
+
 .lead-header {
   font-family: var(--mono);
   font-size: 0.68rem;

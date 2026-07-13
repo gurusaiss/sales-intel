@@ -4,14 +4,18 @@ import {
   saveResumeText,
   scoreJobMatch,
   generateCoverLetter,
+  optimizeResumeText,
   fetchJobs,
   addJobApplication,
   updateJobStatus,
   deleteJobApplication,
+  linkJobReferral,
+  fetchAllPersons,
   type JobMatchResult,
   type JobApplication,
   type JobStatus,
 } from "./api";
+import type { CrmPerson } from "./types";
 
 const JOB_STATUSES: JobStatus[] = ["saved", "applied", "interviewing", "offer", "rejected"];
 
@@ -30,6 +34,9 @@ export default function CareerView() {
 
   const [jobs, setJobs] = useState<JobApplication[]>([]);
   const [jobsLoaded, setJobsLoaded] = useState(false);
+  const [optimized, setOptimized] = useState<string | null>(null);
+  const [optimizing, setOptimizing] = useState(false);
+  const [trackedPersons, setTrackedPersons] = useState<CrmPerson[]>([]);
 
   useEffect(() => {
     fetchResume()
@@ -37,7 +44,30 @@ export default function CareerView() {
         if (resume) setResumeText(resume.text);
       })
       .catch(() => {});
+    fetchAllPersons()
+      .then(setTrackedPersons)
+      .catch(() => {});
   }, []);
+
+  async function handleOptimizeResume() {
+    if (!resumeText.trim()) return;
+    setOptimizing(true);
+    setError(null);
+    try {
+      const result = await optimizeResumeText(role.trim() || undefined);
+      setOptimized(result);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to optimize resume");
+    } finally {
+      setOptimizing(false);
+    }
+  }
+
+  async function handleLinkReferral(jobId: string, linkedinUrl: string) {
+    if (!linkedinUrl) return;
+    const job = await linkJobReferral(jobId, linkedinUrl);
+    setJobs((current) => current.map((j) => (j.id === jobId ? job : j)));
+  }
 
   async function handleSaveResume() {
     if (!resumeText.trim()) return;
@@ -128,7 +158,33 @@ export default function CareerView() {
           <button className="ghost-button accent" onClick={handleSaveResume}>
             {resumeSaved ? "Saved!" : "Save resume"}
           </button>
+          <button className="ghost-button" disabled={optimizing} onClick={handleOptimizeResume}>
+            {optimizing ? "Optimizing…" : "AI-optimize resume"}
+          </button>
         </div>
+        {optimized && (
+          <div className="card highlight" style={{ marginTop: "0.75rem" }}>
+            <span className="card-label">AI-optimized resume</span>
+            <pre className="draft-body">{optimized}</pre>
+            <div className="queue-actions">
+              <button
+                className="ghost-button"
+                onClick={() => navigator.clipboard.writeText(optimized)}
+              >
+                Copy
+              </button>
+              <button
+                className="ghost-button accent"
+                onClick={() => {
+                  setResumeText(optimized);
+                  setOptimized(null);
+                }}
+              >
+                Use this version
+              </button>
+            </div>
+          </div>
+        )}
       </section>
 
       <section className="card">
@@ -240,15 +296,16 @@ export default function CareerView() {
 
         {jobs.length > 0 && (
           <div className="lead-table" style={{ marginTop: "0.75rem" }}>
-            <div className="lead-row lead-header">
+            <div className="lead-row jobs-row lead-header">
               <span />
               <span>Company</span>
               <span>Role</span>
               <span>Status</span>
+              <span>Referral contact</span>
               <span></span>
             </div>
             {jobs.map((job) => (
-              <div className="lead-row" key={job.id}>
+              <div className="lead-row jobs-row" key={job.id}>
                 <span />
                 <span>{job.company}</span>
                 <span>{job.role}</span>
@@ -264,6 +321,25 @@ export default function CareerView() {
                       </option>
                     ))}
                   </select>
+                </span>
+                <span>
+                  {job.referralPersonLinkedinUrl ? (
+                    <span className="badge badge-medium">{job.referralContactName}</span>
+                  ) : (
+                    <select
+                      value=""
+                      className="meeting-input"
+                      onChange={(e) => handleLinkReferral(job.id, e.target.value)}
+                    >
+                      <option value="">Link tracked contact…</option>
+                      {trackedPersons.map((p) => (
+                        <option key={p.id} value={p.linkedinUrl}>
+                          {p.name}
+                          {p.company ? ` (${p.company})` : ""}
+                        </option>
+                      ))}
+                    </select>
+                  )}
                 </span>
                 <span>
                   <button className="ghost-button danger" onClick={() => handleDeleteJob(job.id)}>
