@@ -2,6 +2,10 @@ import { Router } from "express";
 import { z } from "zod";
 import { signup, login } from "../services/userStore";
 import { issueToken } from "../services/authToken";
+import { createRateLimit } from "../middleware/rateLimit";
+
+const signupLimiter = createRateLimit(10, 3_600_000);
+const loginLimiter = createRateLimit(20, 60_000);
 
 const router = Router();
 
@@ -15,7 +19,7 @@ const credentialsSchema = z.object({
  * Not gated by requireApiKey — signing up is how a new account gets created
  * in the first place, so there's nothing to authenticate against yet.
  */
-router.post("/auth/signup", async (req, res) => {
+router.post("/auth/signup", signupLimiter, async (req, res) => {
   const parsed = credentialsSchema.safeParse(req.body);
   if (!parsed.success) {
     return res.status(400).json({ error: parsed.error.issues[0]?.message ?? "Invalid request" });
@@ -30,7 +34,7 @@ router.post("/auth/signup", async (req, res) => {
   }
 });
 
-router.post("/auth/login", async (req, res) => {
+router.post("/auth/login", loginLimiter, async (req, res) => {
   const parsed = credentialsSchema.safeParse(req.body);
   if (!parsed.success) {
     return res.status(400).json({ error: parsed.error.issues[0]?.message ?? "Invalid request" });

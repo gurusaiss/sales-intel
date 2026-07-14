@@ -105,5 +105,46 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
     return true;
   }
 
+  if (message.type === "ANALYZE_WEBSITE") {
+    (async () => {
+      try {
+        const { token, apiKey } = await chrome.storage.local.get(["token", "apiKey"]);
+        const headers = { "content-type": "application/json" };
+        if (apiKey) headers["x-api-key"] = apiKey;
+        if (token) headers["authorization"] = "Bearer " + token;
+
+        // POST to start analysis
+        const startRes = await fetch(API_BASE + "/api/analyze", {
+          method: "POST",
+          headers,
+          body: JSON.stringify({ url: message.url }),
+        });
+        if (!startRes.ok) {
+          sendResponse({ error: "Failed to start: " + startRes.status });
+          return;
+        }
+        const { id } = await startRes.json();
+
+        // Poll until done (max 60s)
+        let attempts = 0;
+        while (attempts < 30) {
+          await new Promise((r) => setTimeout(r, 2000));
+          const pollRes = await fetch(API_BASE + "/api/analyze/" + id, { headers });
+          if (!pollRes.ok) break;
+          const data = await pollRes.json();
+          if (data.status === "done" || data.status === "failed") {
+            sendResponse(data);
+            return;
+          }
+          attempts++;
+        }
+        sendResponse({ error: "Analysis timed out after 60 seconds" });
+      } catch (err) {
+        sendResponse({ error: err.message ?? "Unknown error" });
+      }
+    })();
+    return true; // keep port open for async sendResponse
+  }
+
   return false;
 });

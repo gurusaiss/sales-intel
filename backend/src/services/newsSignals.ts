@@ -58,3 +58,16 @@ function titleMentionsCompany(title: string, companyName: string): boolean {
   const normalizedCompany = companyName.trim().toLowerCase().split(/\s+/)[0];
   return title.toLowerCase().includes(normalizedCompany);
 }
+
+export async function fetchHnSignalForUrl(url: string): Promise<{ points: number; comments: number; storyId: number } | null> {
+  try {
+    const res = await fetch(`https://hn.algolia.com/api/v1/search?query=${encodeURIComponent(url)}&restrictSearchableAttributes=url&hitsPerPage=1`, {
+      signal: AbortSignal.timeout(5000),
+    });
+    if (!res.ok) return null;
+    const data = await res.json() as { hits?: Array<{ points?: number; num_comments?: number; objectID?: string }> };
+    const hit = data.hits?.[0];
+    if (!hit) return null;
+    return { points: hit.points ?? 0, comments: hit.num_comments ?? 0, storyId: parseInt(hit.objectID ?? "0", 10) };
+  } catch { return null; }
+}

@@ -1,6 +1,7 @@
 import { EnrichmentResult } from "../types";
 import { CrmPerson } from "../types/crm";
 import { getTemplateSpec } from "./templates";
+import { callAI } from "./aiRouter";
 
 const GROQ_API_KEY = process.env.GROQ_API_KEY;
 const GROQ_MODEL = process.env.GROQ_MODEL || "llama-3.3-70b-versatile";
@@ -44,7 +45,7 @@ export async function callGroq(prompt: string, maxTokens: number): Promise<strin
 }
 
 export async function generateResearchOutput(enrichment: EnrichmentResult): Promise<AiOutput> {
-  const text = await callGroq(buildPrompt(enrichment), 800);
+  const text = await callAI(buildPrompt(enrichment), undefined, 800);
   if (!text) return templateFallback(enrichment);
   return parseModelOutput(text, enrichment);
 }

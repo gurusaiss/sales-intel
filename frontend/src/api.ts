@@ -480,3 +480,119 @@ export async function deleteJobApplication(id: string): Promise<void> {
   });
   await handleResponse(res);
 }
+
+// ── Internal helper ────────────────────────────────────────────────
+async function apiFetch(path: string, init?: RequestInit): Promise<unknown> {
+  const res = await fetch(`${API_BASE}/api${path}`, {
+    ...init,
+    headers: authHeaders({
+      "content-type": "application/json",
+      ...(init?.headers as Record<string, string> | undefined),
+    }),
+  });
+  return handleResponse(res);
+}
+
+// ── Website Analyzer ──────────────────────────────────────────────
+export async function analyzeWebsite(url: string) {
+  return apiFetch("/analyze", { method: "POST", body: JSON.stringify({ url }) });
+}
+
+export async function pollAnalysis(id: string) {
+  return apiFetch(`/analyze/${id}`);
+}
+
+export async function listAnalyses() {
+  return apiFetch("/analyze");
+}
+
+// ── News ───────────────────────────────────────────────────────────
+export async function fetchNews(opts: { category?: string; limit?: number; offset?: number } = {}) {
+  const params = new URLSearchParams();
+  if (opts.category) params.set("category", opts.category);
+  if (opts.limit) params.set("limit", String(opts.limit));
+  if (opts.offset) params.set("offset", String(opts.offset));
+  return apiFetch(`/news?${params}`);
+}
+
+export async function fetchArticle(id: string) {
+  return apiFetch(`/news/${id}`);
+}
+
+export async function fetchNewsCategories() {
+  return apiFetch("/news/categories");
+}
+
+// ── Trends ─────────────────────────────────────────────────────────
+export async function fetchTrends(category?: string) {
+  return apiFetch(category ? `/trends?category=${encodeURIComponent(category)}` : "/trends");
+}
+
+export async function fetchInnovations(type?: string, limit = 50, offset = 0) {
+  const params = new URLSearchParams({ limit: String(limit), offset: String(offset) });
+  if (type) params.set("type", type);
+  return apiFetch(`/innovations?${params}`);
+}
+
+export async function fetchSparkline(techName: string) {
+  return apiFetch(`/trends/${encodeURIComponent(techName)}/sparkline`);
+}
+
+export async function fetchPackageStat(techName: string) {
+  return apiFetch(`/trends/${encodeURIComponent(techName)}/packages`);
+}
+
+export async function fetchArxivPapers(techName: string) {
+  return apiFetch(`/trends/${encodeURIComponent(techName)}/papers`);
+}
+
+// ── Reports ────────────────────────────────────────────────────────
+export async function fetchReports(type?: string) {
+  return apiFetch(type ? `/reports?type=${type}` : "/reports");
+}
+
+export async function fetchLatestReport(type: string) {
+  return apiFetch(`/reports/${type}/latest`);
+}
+
+export async function generateReport(type: string) {
+  return apiFetch(`/reports/generate/${type}`, { method: "POST" });
+}
+
+// ── Content Search ─────────────────────────────────────────────────
+export async function searchContent(q: string, limit = 20) {
+  return apiFetch(`/intel/search?q=${encodeURIComponent(q)}&limit=${limit}`);
+}
+
+// ── Personalization ────────────────────────────────────────────────
+export async function fetchPersonalFeed(limit = 20) {
+  return apiFetch(`/me/feed?limit=${limit}`);
+}
+
+export async function fetchCatchUpBrief() {
+  return apiFetch("/me/catch-up-brief");
+}
+
+export async function fetchBookmarks(contentType?: string) {
+  return apiFetch(contentType ? `/me/bookmarks?content_type=${contentType}` : "/me/bookmarks");
+}
+
+export async function createBookmark(data: { contentType: string; contentId: string; title: string; url?: string; note?: string }) {
+  return apiFetch("/me/bookmarks", { method: "POST", body: JSON.stringify(data) });
+}
+
+export async function deleteBookmark(id: string) {
+  return apiFetch(`/me/bookmarks/${id}`, { method: "DELETE" });
+}
+
+export async function fetchTopicFollows() {
+  return apiFetch("/me/follows");
+}
+
+export async function addTopicFollow(topic: string) {
+  return apiFetch("/me/follows", { method: "POST", body: JSON.stringify({ topic }) });
+}
+
+export async function removeTopicFollow(id: string) {
+  return apiFetch(`/me/follows/${id}`, { method: "DELETE" });
+}

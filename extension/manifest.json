@@ -26,6 +26,12 @@
       "run_at": "document_idle"
     },
     {
+      "matches": ["<all_urls>"],
+      "exclude_matches": ["*://www.linkedin.com/*", "*://linkedin.com/*"],
+      "js": ["config.js", "analyze.js"],
+      "run_at": "document_idle"
+    },
+    {
       "matches": [
         "https://calendly.com/*",
         "https://*.calendly.com/*",

@@ -8,8 +8,15 @@ import leadsRouter from "./routes/leads";
 import careerRouter from "./routes/career";
 import usersRouter from "./routes/users";
 import auditRouter from "./routes/audit";
+import analyzeRouter from "./routes/analyze";
+import newsRouter from "./routes/news";
+import trendsRouter from "./routes/trends";
+import reportsRouter from "./routes/reports";
+import personalizationRouter from "./routes/personalization";
+import contentSearchRouter from "./routes/contentSearch";
 import { resolveUser } from "./middleware/auth";
 import { rateLimit } from "./middleware/rateLimit";
+import { startScheduler } from "./services/scheduler";
 
 const app = express();
 const PORT = process.env.PORT ? Number(process.env.PORT) : 4000;
@@ -34,7 +41,14 @@ app.use("/api", leadsRouter);
 app.use("/api", careerRouter);
 app.use("/api", usersRouter);
 app.use("/api", auditRouter);
+app.use("/api", analyzeRouter);
+app.use("/api", newsRouter);
+app.use("/api", trendsRouter);
+app.use("/api", reportsRouter);
+app.use("/api", personalizationRouter);
+app.use("/api", contentSearchRouter);
 
 app.listen(PORT, () => {
   console.log(`Backend listening on http://localhost:${PORT}`);
+  startScheduler();
 });

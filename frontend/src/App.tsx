@@ -1,4 +1,4 @@
-import { useState, type FormEvent } from "react";
+import { useState, type FormEvent, useEffect } from "react";
 import { searchQuery, findLinkedPerson } from "./api";
 import type { ResearchResponse, CrmPerson } from "./types";
 import QueueView from "./QueueView";
@@ -7,9 +7,18 @@ import CompanySearchView from "./CompanySearchView";
 import CareerView from "./CareerView";
 import AuthBar from "./AuthBar";
 import HistoryView from "./HistoryView";
+import AnalyzeView from "./AnalyzeView";
+import NewsView from "./NewsView";
+import TrendsView from "./TrendsView";
+import NewsAndTrendsView from "./NewsAndTrendsView";
+import DiscoverView from "./DiscoverView";
+import ReportsView from "./ReportsView";
+import SearchView from "./SearchView";
+import SavedView from "./SavedView";
+import { ToastContainer } from "./components/Toast";
 import "./App.css";
 
-type Tab = "research" | "companies" | "queue" | "analytics" | "career" | "history";
+type Tab = "research" | "companies" | "analyze" | "newstrends" | "discover" | "reports" | "search" | "saved" | "queue" | "analytics" | "career" | "history";
 
 function App() {
   const [tab, setTab] = useState<Tab>("research");
@@ -19,6 +28,19 @@ function App() {
   const [error, setError] = useState<string | null>(null);
   const [result, setResult] = useState<ResearchResponse | null>(null);
   const [linkedPerson, setLinkedPerson] = useState<CrmPerson | null>(null);
+  const [darkMode, setDarkMode] = useState(() => {
+    if (typeof window !== "undefined") {
+      const saved = localStorage.getItem("salesIntelTheme");
+      if (saved) return saved === "dark";
+      return window.matchMedia("(prefers-color-scheme: dark)").matches;
+    }
+    return false;
+  });
+
+  useEffect(() => {
+    document.documentElement.setAttribute("data-theme", darkMode ? "dark" : "light");
+    localStorage.setItem("salesIntelTheme", darkMode ? "dark" : "light");
+  }, [darkMode]);
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
@@ -48,6 +70,9 @@ function App() {
     <div className="app">
       <header className="app-header">
         <span className="eyebrow">Sales Intelligence — Research MVP</span>
+        <button className="theme-toggle" onClick={() => setDarkMode((d) => !d)} aria-label="Toggle theme">
+          {darkMode ? "☀" : "☾"}
+        </button>
         <AuthBar />
         <h1>
           {tab === "research"
@@ -99,6 +124,12 @@ function App() {
           >
             Analytics
           </button>
+          <button className={`tab-button ${tab === "analyze" ? "active" : ""}`} onClick={() => setTab("analyze")}>Analyze</button>
+          <button className={`tab-button ${tab === "newstrends" ? "active" : ""}`} onClick={() => setTab("newstrends")}>News & Trends</button>
+          <button className={`tab-button ${tab === "discover" ? "active" : ""}`} onClick={() => setTab("discover")}>Discover</button>
+          <button className={`tab-button ${tab === "reports" ? "active" : ""}`} onClick={() => setTab("reports")}>Reports</button>
+          <button className={`tab-button ${tab === "search" ? "active" : ""}`} onClick={() => setTab("search")}>Search</button>
+          <button className={`tab-button ${tab === "saved" ? "active" : ""}`} onClick={() => setTab("saved")}>Saved</button>
         </nav>
 
         {tab === "research" && (
@@ -152,9 +183,22 @@ function App() {
         <CareerView />
       ) : tab === "history" ? (
         <HistoryView />
+      ) : tab === "analyze" ? (
+        <AnalyzeView />
+      ) : tab === "newstrends" ? (
+        <NewsAndTrendsView />
+      ) : tab === "discover" ? (
+        <DiscoverView />
+      ) : tab === "reports" ? (
+        <ReportsView />
+      ) : tab === "search" ? (
+        <SearchView />
+      ) : tab === "saved" ? (
+        <SavedView />
       ) : (
         <AnalyticsView />
       )}
+      <ToastContainer />
     </div>
   );
 }

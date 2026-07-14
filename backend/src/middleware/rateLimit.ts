@@ -30,3 +30,28 @@ export function rateLimit(req: Request, res: Response, next: NextFunction) {
 
   next();
 }
+
+export function createRateLimit(maxRequests: number, windowMs: number) {
+  const instanceHits = new Map<string, number[]>();
+
+  return function rateLimitMiddleware(req: Request, res: Response, next: NextFunction) {
+    const key = `${req.userId ?? "anon"}:${req.ip}`;
+    const now = Date.now();
+    const timestamps = (instanceHits.get(key) ?? []).filter((t) => now - t < windowMs);
+
+    if (timestamps.length >= maxRequests) {
+      return res.status(429).json({ error: "Too many requests. Please slow down." });
+    }
+
+    timestamps.push(now);
+    instanceHits.set(key, timestamps);
+
+    if (instanceHits.size > 5000) {
+      for (const [k, v] of instanceHits) {
+        if (v.every((t) => now - t > windowMs)) instanceHits.delete(k);
+      }
+    }
+
+    next();
+  };
+}
