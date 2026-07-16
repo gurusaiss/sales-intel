@@ -8,8 +8,6 @@ import CareerView from "./CareerView";
 import AuthBar from "./AuthBar";
 import HistoryView from "./HistoryView";
 import AnalyzeView from "./AnalyzeView";
-import NewsView from "./NewsView";
-import TrendsView from "./TrendsView";
 import NewsAndTrendsView from "./NewsAndTrendsView";
 import DiscoverView from "./DiscoverView";
 import ReportsView from "./ReportsView";
