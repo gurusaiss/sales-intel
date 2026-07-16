@@ -1,17 +1,17 @@
 import { parseFeed } from "./rssParser";
-import { upsertInnovation } from "./trendStore";
+import { upsertInnovationsBatch } from "./trendStore";
 import { DISCOVER_FEEDS, extractGithubUrl, inferIsOpenSource } from "./discoverSources";
 
 export async function pollDiscoverSources(): Promise<number> {
-  let newCount = 0;
-  for (const feed of DISCOVER_FEEDS) {
-    try {
+  // Fetch all discover feeds in parallel; each fails independently.
+  const results = await Promise.all(
+    DISCOVER_FEEDS.map(async (feed) => {
       const items = await parseFeed(feed.url, feed.source, feed.category);
-      for (const item of items.slice(0, 15)) {
+      return items.slice(0, 15).map((item) => {
         const githubUrl = extractGithubUrl(item.content + " " + item.url);
         const isOss = inferIsOpenSource(item.url, item.content);
         const type = isOss && feed.type === "oss" ? "oss" : feed.type;
-        await upsertInnovation({
+        return {
           name: item.title.replace(/^Show HN:\s*/i, "").replace(/^Launch HN:\s*/i, "").trim().slice(0, 120),
           type,
           description: item.content.slice(0, 400) || item.title,
@@ -19,14 +19,12 @@ export async function pollDiscoverSources(): Promise<number> {
           githubUrl,
           impactScore: 50,
           tags: [feed.category, feed.source],
-        });
-        newCount++;
-      }
-      await new Promise((r) => setTimeout(r, 400));
-    } catch (err) {
-      console.warn("[discoverPoller] Failed:", feed.source, err instanceof Error ? err.message : err);
-    }
-  }
-  console.log("[discoverPoller] Polled discover sources, new:", newCount);
-  return newCount;
+        };
+      });
+    })
+  );
+
+  const added = await upsertInnovationsBatch(results.flat());
+  console.log("[discoverPoller] Polled discover sources, new:", added);
+  return added;
 }

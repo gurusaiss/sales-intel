@@ -15,11 +15,11 @@ interface Report {
 
 const REPORT_TYPES = ["daily", "weekly", "monthly", "founder", "developer", "investor", "ai", "sales_digest"];
 
-const API_BASE = import.meta.env.VITE_API_URL ?? "http://localhost:4000/api";
-const API_KEY = import.meta.env.VITE_API_KEY ?? "";
+const API_BASE = (import.meta.env.VITE_API_BASE ?? "http://localhost:4000") + "/api";
+const API_KEY = import.meta.env.VITE_APP_API_KEY ?? "";
 
 async function apiFetch(path: string, opts?: RequestInit) {
-  const token = localStorage.getItem("salesIntelToken");
+  const token = localStorage.getItem("sessionToken");
   const headers: Record<string, string> = { "content-type": "application/json" };
   if (API_KEY) headers["x-api-key"] = API_KEY;
   if (token) headers["authorization"] = `Bearer ${token}`;

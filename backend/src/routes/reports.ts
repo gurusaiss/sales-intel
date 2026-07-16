@@ -3,6 +3,7 @@ import { requireApiKey } from "../middleware/apiKey";
 import { listReports, getLatestReport, getReport } from "../services/reportStore";
 import { generateReport } from "../services/reportGenerator";
 import { ReportType, REPORT_PROMPTS } from "../prompts/reportPrompts";
+import { ensureNews } from "../services/liveData";
 
 const router = Router();
 const VALID_TYPES = Object.keys(REPORT_PROMPTS) as ReportType[];
@@ -11,6 +12,15 @@ router.get("/reports", requireApiKey, async (req, res) => {
   try {
     const type = req.query.type as ReportType | undefined;
     const reports = await listReports(type);
+    // Cold start: no reports yet. Reports are AI-generated from articles, so
+    // make sure articles exist, then kick off a daily report in the background.
+    // It'll be ready on the next load (requires an AI key to be configured).
+    if (reports.length === 0) {
+      void (async () => {
+        await ensureNews();
+        await generateReport("daily").catch(() => {});
+      })();
+    }
     res.json({ reports });
   } catch { res.status(500).json({ error: "Failed" }); }
 });

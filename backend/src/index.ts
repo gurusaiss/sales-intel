@@ -14,6 +14,7 @@ import trendsRouter from "./routes/trends";
 import reportsRouter from "./routes/reports";
 import personalizationRouter from "./routes/personalization";
 import contentSearchRouter from "./routes/contentSearch";
+import liveRouter from "./routes/live";
 import { resolveUser } from "./middleware/auth";
 import { rateLimit } from "./middleware/rateLimit";
 import { startScheduler } from "./services/scheduler";
@@ -47,6 +48,7 @@ app.use("/api", trendsRouter);
 app.use("/api", reportsRouter);
 app.use("/api", personalizationRouter);
 app.use("/api", contentSearchRouter);
+app.use("/api", liveRouter);
 
 app.listen(PORT, () => {
   console.log(`Backend listening on http://localhost:${PORT}`);

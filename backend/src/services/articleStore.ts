@@ -1,4 +1,4 @@
-import { readJson, writeJson } from "./kvStore";
+import { readJson, writeJson, withKeyLock } from "./kvStore";
 
 export interface Article {
   id: string;
@@ -46,28 +46,63 @@ export async function getArticle(id: string): Promise<Article | null> {
 }
 
 export async function upsertArticle(item: Omit<Article, "id" | "aiProcessed" | "viewCount"> & { id?: string }): Promise<Article> {
-  const all = await readJson<Article[]>("articles", []);
-  const existing = all.find((a) => a.url === item.url);
-  if (existing) {
-    Object.assign(existing, item);
+  return withKeyLock("articles", async () => {
+    const all = await readJson<Article[]>("articles", []);
+    const existing = all.find((a) => a.url === item.url);
+    if (existing) {
+      Object.assign(existing, item);
+      await writeJson("articles", all);
+      return existing;
+    }
+    const article: Article = { ...item, id: item.id ?? crypto.randomUUID(), aiProcessed: false, viewCount: 0 };
+    all.unshift(article);
+    // Cap at 2000 articles
+    if (all.length > 2000) all.splice(2000);
     await writeJson("articles", all);
-    return existing;
-  }
-  const article: Article = { ...item, id: item.id ?? crypto.randomUUID(), aiProcessed: false, viewCount: 0 };
-  all.unshift(article);
-  // Cap at 2000 articles
-  if (all.length > 2000) all.splice(2000);
-  await writeJson("articles", all);
-  return article;
+    return article;
+  });
+}
+
+/**
+ * Batch upsert — one read-modify-write for the whole set instead of one per
+ * item. Polling 25 feeds × ~500 items previously did 500 sequential locked
+ * read-modify-write cycles on an ever-growing array (O(n²), ~50s cold start).
+ * This does a single merge and single write.
+ */
+export async function upsertArticlesBatch(
+  items: Array<Omit<Article, "id" | "aiProcessed" | "viewCount"> & { id?: string }>
+): Promise<number> {
+  if (items.length === 0) return 0;
+  return withKeyLock("articles", async () => {
+    const all = await readJson<Article[]>("articles", []);
+    const byUrl = new Map(all.map((a) => [a.url, a]));
+    let added = 0;
+    for (const item of items) {
+      const existing = byUrl.get(item.url);
+      if (existing) {
+        Object.assign(existing, item);
+      } else {
+        const article: Article = { ...item, id: item.id ?? crypto.randomUUID(), aiProcessed: false, viewCount: 0 };
+        all.unshift(article);
+        byUrl.set(article.url, article);
+        added++;
+      }
+    }
+    if (all.length > 2000) all.splice(2000);
+    await writeJson("articles", all);
+    return added;
+  });
 }
 
 export async function updateArticle(id: string, patch: Partial<Article>): Promise<void> {
-  const all = await readJson<Article[]>("articles", []);
-  const idx = all.findIndex((a) => a.id === id);
-  if (idx >= 0) {
-    all[idx] = { ...all[idx], ...patch };
-    await writeJson("articles", all);
-  }
+  return withKeyLock("articles", async () => {
+    const all = await readJson<Article[]>("articles", []);
+    const idx = all.findIndex((a) => a.id === id);
+    if (idx >= 0) {
+      all[idx] = { ...all[idx], ...patch };
+      await writeJson("articles", all);
+    }
+  });
 }
 
 export async function incrementViewCount(id: string): Promise<void> {

@@ -3,11 +3,13 @@ import { requireApiKey } from "../middleware/apiKey";
 import { listTrends, listInnovations, getTrendCategories, getInnovationTypes, getSparkline } from "../services/trendStore";
 import { getStatForTech } from "../services/packageStats";
 import { searchArxivPapers } from "../services/arxivService";
+import { ensureTrends, ensureInnovations } from "../services/liveData";
 
 const router = Router();
 
 router.get("/trends", requireApiKey, async (req, res) => {
   try {
+    await ensureTrends();
     const category = typeof req.query.category === "string" ? req.query.category : undefined;
     const trends = await listTrends(category);
     res.json({ trends });
@@ -36,6 +38,7 @@ router.get("/trends/:name/papers", requireApiKey, async (req, res) => {
 
 router.get("/innovations", requireApiKey, async (req, res) => {
   try {
+    await ensureInnovations();
     const type = typeof req.query.type === "string" ? req.query.type : undefined;
     const limit = Math.min(100, parseInt(String(req.query.limit ?? "50"), 10) || 50);
     const offset = parseInt(String(req.query.offset ?? "0"), 10) || 0;

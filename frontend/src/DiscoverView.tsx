@@ -4,17 +4,28 @@ interface Innovation {
   id: string;
   name: string;
   description: string;
-  source: string;
+  source?: string;
   type: string;
   language?: string;
   starsToday?: number;
-  totalStars?: number;
+  githubStars?: number;
+  tags?: string[];
   impactScore?: number;
   githubUrl?: string;
   url: string;
   discoveredAt: string;
   bookmarked?: boolean;
 }
+
+const TYPE_LABELS: Record<string, string> = {
+  ai_release: "AI Tool",
+  oss: "Open Source",
+  startup: "Startup",
+  dev_tool: "Dev Tool",
+  sdk: "SDK",
+  api: "API",
+  other: "Other",
+};
 
 const SOURCE_LABELS: Record<string, string> = {
   "Product Hunt": "PH",
@@ -32,16 +43,29 @@ const SOURCE_COLORS: Record<string, string> = {
   Beta: "#6c47ff",
 };
 
-const TYPE_FILTERS = [
-  "All",
-  "AI Tools",
-  "Open Source",
-  "Startups",
-  "Dev Tools",
-  "SDKs",
-  "APIs",
-  "Other",
+// UI label → backend innovation `type` value. The backend stores machine
+// types (ai_release, oss, ...); the chips show friendly labels.
+const TYPE_FILTERS: Array<{ label: string; value: string }> = [
+  { label: "All", value: "All" },
+  { label: "AI Tools", value: "ai_release" },
+  { label: "Open Source", value: "oss" },
+  { label: "Startups", value: "startup" },
+  { label: "Dev Tools", value: "dev_tool" },
+  { label: "SDKs", value: "sdk" },
+  { label: "APIs", value: "api" },
+  { label: "Other", value: "other" },
 ];
+
+const API_BASE = (import.meta.env.VITE_API_BASE ?? "http://localhost:4000") + "/api";
+const API_KEY = import.meta.env.VITE_APP_API_KEY ?? "";
+
+function authHeaders(): Record<string, string> {
+  const token = localStorage.getItem("sessionToken");
+  const h: Record<string, string> = { "content-type": "application/json" };
+  if (API_KEY) h["x-api-key"] = API_KEY;
+  if (token) h["authorization"] = `Bearer ${token}`;
+  return h;
+}
 
 function timeAgo(dateStr: string): string {
   const now = Date.now();
@@ -117,13 +141,23 @@ export default function DiscoverView() {
         offset: String(page * PAGE_SIZE),
       });
       if (typeFilter !== "All") params.set("type", typeFilter);
-      if (search.trim()) params.set("q", search.trim());
 
-      const res = await fetch(`/api/innovations?${params.toString()}`);
+      const res = await fetch(`${API_BASE}/innovations?${params.toString()}`, {
+        headers: authHeaders(),
+      });
       if (!res.ok) throw new Error("Failed to fetch");
       const data = await res.json();
-      setInnovations(data.items ?? data);
-      setTotal(data.total ?? (data.items ?? data).length);
+      const list: Innovation[] = data.innovations ?? data.items ?? [];
+      const q = search.trim().toLowerCase();
+      const filtered = q
+        ? list.filter(
+            (i) =>
+              i.name?.toLowerCase().includes(q) ||
+              i.description?.toLowerCase().includes(q)
+          )
+        : list;
+      setInnovations(filtered);
+      setTotal(q ? filtered.length : data.total ?? list.length);
     } catch {
       addToast("Failed to load innovations", "error");
       setInnovations([]);
@@ -145,15 +179,14 @@ export default function DiscoverView() {
     if (bookmarking.has(item.id)) return;
     setBookmarking((prev) => new Set(prev).add(item.id));
     try {
-      const res = await fetch("/api/me/bookmarks", {
+      const res = await fetch(`${API_BASE}/me/bookmarks`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: authHeaders(),
         body: JSON.stringify({
-          type: "innovation",
-          refId: item.id,
+          contentType: "innovation",
+          contentId: item.id,
           title: item.name,
           url: item.url,
-          meta: { source: item.source, type: item.type },
         }),
       });
       if (!res.ok) throw new Error();
@@ -211,11 +244,11 @@ export default function DiscoverView() {
         <div className="type-chips">
           {TYPE_FILTERS.map((f) => (
             <button
-              key={f}
-              className={`type-chip${typeFilter === f ? " active" : ""}`}
-              onClick={() => setTypeFilter(f)}
+              key={f.value}
+              className={`type-chip${typeFilter === f.value ? " active" : ""}`}
+              onClick={() => setTypeFilter(f.value)}
             >
-              {f}
+              {f.label}
             </button>
           ))}
         </div>
@@ -250,7 +283,8 @@ export default function DiscoverView() {
         <>
           <div className="discover-grid">
             {innovations.map((item) => {
-              const sourceLabel = SOURCE_LABELS[item.source] ?? item.source;
+              const rawSource = item.source ?? (item.githubUrl ? "GitHub" : item.tags?.[1]) ?? "Web";
+              const sourceLabel = SOURCE_LABELS[rawSource] ?? rawSource;
               const sourceColor = SOURCE_COLORS[sourceLabel] ?? "#555";
               const impact = Math.min(100, Math.max(0, item.impactScore ?? 0));
               return (
@@ -265,7 +299,7 @@ export default function DiscoverView() {
                     </span>
                     <div className="card-chips">
                       {item.type && (
-                        <span className="type-tag">{item.type}</span>
+                        <span className="type-tag">{TYPE_LABELS[item.type] ?? item.type}</span>
                       )}
                       {item.language && (
                         <span className="lang-tag">{item.language}</span>
@@ -295,12 +329,12 @@ export default function DiscoverView() {
                         +{formatNum(item.starsToday)}
                       </span>
                     )}
-                    {item.totalStars !== undefined && (
+                    {item.githubStars !== undefined && item.githubStars > 0 && (
                       <span className="stat-badge total-stars" title="Total stars">
                         <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                           <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z" />
                         </svg>
-                        {formatNum(item.totalStars)}
+                        {formatNum(item.githubStars)}
                       </span>
                     )}
                     <span className="stat-time">{timeAgo(item.discoveredAt)}</span>

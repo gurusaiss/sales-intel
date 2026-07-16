@@ -85,11 +85,37 @@ async function readLocalFile<T>(key: string, fallback: T): Promise<T> {
 async function writeLocalFile<T>(key: string, value: T): Promise<void> {
   await fs.mkdir(DATA_DIR, { recursive: true });
   const file = path.join(DATA_DIR, `${safeFilename(key)}.json`);
-  await fs.writeFile(file, JSON.stringify(value, null, 2), "utf-8");
+  // Atomic write: serialize to a temp file then rename over the target.
+  // rename() is atomic on the same filesystem, so a concurrent reader never
+  // sees a half-written file (which would JSON.parse-fail and silently return
+  // the fallback — the root cause of "data randomly empty" under concurrent
+  // polls). The temp name is per-write-unique to avoid two writers colliding.
+  const tmp = `${file}.${process.pid}.${writeCounter++}.tmp`;
+  await fs.writeFile(tmp, JSON.stringify(value, null, 2), "utf-8");
+  await fs.rename(tmp, file);
 }
+
+let writeCounter = 0;
 
 export function isDurablePersistenceConfigured(): boolean {
   return Boolean(UPSTASH_URL && UPSTASH_TOKEN);
+}
+
+/**
+ * Per-key async mutex. Stores that do read-modify-write on a single key
+ * (append an article, upsert a trend) must run under this so two concurrent
+ * pollers can't both read the old value, each append, and clobber each other's
+ * writes (lost updates). Serializes only same-key work; different keys stay
+ * fully parallel.
+ */
+const keyLocks = new Map<string, Promise<unknown>>();
+
+export function withKeyLock<T>(key: string, fn: () => Promise<T>): Promise<T> {
+  const prev = keyLocks.get(key) ?? Promise.resolve();
+  const next = prev.then(fn, fn);
+  // Keep the chain alive but don't let a rejection poison the next waiter.
+  keyLocks.set(key, next.catch(() => undefined));
+  return next;
 }
 
 export const DEFAULT_USER_ID = "default";

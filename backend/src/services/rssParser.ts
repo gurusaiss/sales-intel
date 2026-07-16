@@ -15,6 +15,14 @@ const parser = new Parser({
     item: ["media:thumbnail", "enclosure", ["media:content", "mediaContent"]],
   },
   timeout: 15000,
+  headers: {
+    // Several feeds (InfoQ, Cloudflare, others behind CDNs/WAFs) reject the
+    // default rss-parser User-Agent with 403/406. A real browser-like UA is
+    // accepted everywhere we poll.
+    "User-Agent":
+      "Mozilla/5.0 (compatible; SalesIntelBot/1.0; +https://sales-intel.onrender.com)",
+    Accept: "application/rss+xml, application/atom+xml, application/xml, text/xml, */*",
+  },
 });
 
 function extractImage(item: Record<string, unknown>): string | undefined {

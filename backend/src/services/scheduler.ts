@@ -6,6 +6,7 @@ import { generateReport, generateAllScheduledReports } from "./reportGenerator";
 import { fetchPackageStats } from "./packageStats";
 import { readJson, writeJson } from "./kvStore";
 import { pollDiscoverSources } from "./discoverPoller";
+import { refreshAll } from "./liveData";
 
 async function withGuard(jobName: string, fn: () => Promise<void>): Promise<void> {
   const key = `scheduler:last_run:${jobName}`;
@@ -80,14 +81,14 @@ export function startScheduler(): void {
 
   console.log("[scheduler] All cron jobs started");
 
-  // Run initial data load on startup (non-blocking)
-  setTimeout(async () => {
+  // Run initial data load on startup (non-blocking). Routed through liveData so
+  // it shares the same de-dupe lock as the on-demand endpoint polls — this
+  // prevents two full polls running concurrently and racing on the same store
+  // keys right after boot.
+  setTimeout(() => {
     console.log("[scheduler] Running initial data load...");
-    await pollAllSources().catch(console.error);
-    await summarizePendingArticles(10).catch(console.error);
-    await syncGithubTrending().catch(console.error);
-    await pollDiscoverSources().catch(console.error);
-    await detectTrendsFromArticles().catch(console.error);
-    console.log("[scheduler] Initial data load complete");
+    void refreshAll()
+      .then(() => console.log("[scheduler] Initial data load complete"))
+      .catch(console.error);
   }, 5000);
 }

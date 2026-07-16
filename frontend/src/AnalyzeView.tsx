@@ -51,11 +51,11 @@ interface ExtractedContacts {
   contactPages: string[];
 }
 
-const API_BASE = import.meta.env.VITE_API_URL ?? "http://localhost:4000/api";
-const API_KEY = import.meta.env.VITE_API_KEY ?? "";
+const API_BASE = (import.meta.env.VITE_API_BASE ?? "http://localhost:4000") + "/api";
+const API_KEY = import.meta.env.VITE_APP_API_KEY ?? "";
 
 async function apiFetch(path: string, opts?: RequestInit) {
-  const token = localStorage.getItem("salesIntelToken");
+  const token = localStorage.getItem("sessionToken");
   const headers: Record<string, string> = { "content-type": "application/json", ...(opts?.headers as Record<string, string> ?? {}) };
   if (API_KEY) headers["x-api-key"] = API_KEY;
   if (token) headers["authorization"] = `Bearer ${token}`;
@@ -148,7 +148,7 @@ export default function AnalyzeView() {
 
   function downloadUrl(format: "json" | "csv" | "md") {
     if (!analysis) return "#";
-    const token = localStorage.getItem("salesIntelToken");
+    const token = localStorage.getItem("sessionToken");
     const base = `${API_BASE}/analyze/${analysis.id}/download/${format}`;
     return token ? `${base}?token=${encodeURIComponent(token)}` : base;
   }

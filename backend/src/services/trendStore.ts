@@ -1,4 +1,4 @@
-import { readJson, writeJson } from "./kvStore";
+import { readJson, writeJson, withKeyLock } from "./kvStore";
 
 export interface Trend {
   id: string;
@@ -41,18 +41,20 @@ export async function listTrends(category?: string): Promise<Trend[]> {
 }
 
 export async function upsertTrend(t: Omit<Trend, "id" | "updatedAt"> & { id?: string }): Promise<Trend> {
-  const all = await readJson<Trend[]>("trends", []);
-  const existing = all.find((x) => x.name.toLowerCase() === t.name.toLowerCase());
-  if (existing) {
-    Object.assign(existing, t, { updatedAt: new Date().toISOString() });
+  return withKeyLock("trends", async () => {
+    const all = await readJson<Trend[]>("trends", []);
+    const existing = all.find((x) => x.name.toLowerCase() === t.name.toLowerCase());
+    if (existing) {
+      Object.assign(existing, t, { updatedAt: new Date().toISOString() });
+      await writeJson("trends", all);
+      return existing;
+    }
+    const trend: Trend = { ...t, id: t.id ?? crypto.randomUUID(), updatedAt: new Date().toISOString() };
+    all.unshift(trend);
+    if (all.length > 200) all.splice(200);
     await writeJson("trends", all);
-    return existing;
-  }
-  const trend: Trend = { ...t, id: t.id ?? crypto.randomUUID(), updatedAt: new Date().toISOString() };
-  all.unshift(trend);
-  if (all.length > 200) all.splice(200);
-  await writeJson("trends", all);
-  return trend;
+    return trend;
+  });
 }
 
 export async function listInnovations(type?: string): Promise<Innovation[]> {
@@ -61,18 +63,48 @@ export async function listInnovations(type?: string): Promise<Innovation[]> {
 }
 
 export async function upsertInnovation(item: Omit<Innovation, "id" | "discoveredAt"> & { id?: string }): Promise<Innovation> {
-  const all = await readJson<Innovation[]>("innovations", []);
-  const existing = all.find((x) => x.url === item.url || x.name.toLowerCase() === item.name.toLowerCase());
-  if (existing) {
-    Object.assign(existing, item);
+  return withKeyLock("innovations", async () => {
+    const all = await readJson<Innovation[]>("innovations", []);
+    const existing = all.find((x) => x.url === item.url || x.name.toLowerCase() === item.name.toLowerCase());
+    if (existing) {
+      Object.assign(existing, item);
+      await writeJson("innovations", all);
+      return existing;
+    }
+    const innovation: Innovation = { ...item, id: item.id ?? crypto.randomUUID(), discoveredAt: new Date().toISOString() };
+    all.unshift(innovation);
+    if (all.length > 500) all.splice(500);
     await writeJson("innovations", all);
-    return existing;
-  }
-  const innovation: Innovation = { ...item, id: item.id ?? crypto.randomUUID(), discoveredAt: new Date().toISOString() };
-  all.unshift(innovation);
-  if (all.length > 500) all.splice(500);
-  await writeJson("innovations", all);
-  return innovation;
+    return innovation;
+  });
+}
+
+/** Batch upsert innovations — one read-modify-write for the whole set. */
+export async function upsertInnovationsBatch(
+  items: Array<Omit<Innovation, "id" | "discoveredAt"> & { id?: string }>
+): Promise<number> {
+  if (items.length === 0) return 0;
+  return withKeyLock("innovations", async () => {
+    const all = await readJson<Innovation[]>("innovations", []);
+    const byUrl = new Map(all.map((i) => [i.url, i]));
+    const byName = new Map(all.map((i) => [i.name.toLowerCase(), i]));
+    let added = 0;
+    for (const item of items) {
+      const existing = byUrl.get(item.url) ?? byName.get(item.name.toLowerCase());
+      if (existing) {
+        Object.assign(existing, item);
+      } else {
+        const innovation: Innovation = { ...item, id: item.id ?? crypto.randomUUID(), discoveredAt: new Date().toISOString() };
+        all.unshift(innovation);
+        byUrl.set(innovation.url, innovation);
+        byName.set(innovation.name.toLowerCase(), innovation);
+        added++;
+      }
+    }
+    if (all.length > 500) all.splice(500);
+    await writeJson("innovations", all);
+    return added;
+  });
 }
 
 export async function getTrendCategories(): Promise<string[]> {

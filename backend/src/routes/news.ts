@@ -2,11 +2,13 @@ import { Router } from "express";
 import { requireApiKey } from "../middleware/apiKey";
 import { listArticles, getArticle, incrementViewCount, getArticleCategories } from "../services/articleStore";
 import { fetchHnSignalForUrl } from "../services/newsSignals";
+import { ensureNews } from "../services/liveData";
 
 const router = Router();
 
 router.get("/news", requireApiKey, async (req, res) => {
   try {
+    await ensureNews();
     const category = typeof req.query.category === "string" ? req.query.category : undefined;
     const limit = Math.min(50, parseInt(String(req.query.limit ?? "20"), 10) || 20);
     const offset = parseInt(String(req.query.offset ?? "0"), 10) || 0;
@@ -17,6 +19,7 @@ router.get("/news", requireApiKey, async (req, res) => {
 
 router.get("/news/categories", requireApiKey, async (_req, res) => {
   try {
+    await ensureNews();
     const categories = await getArticleCategories();
     res.json({ categories });
   } catch { res.status(500).json({ error: "Failed" }); }
