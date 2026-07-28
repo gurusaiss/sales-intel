@@ -1,10 +1,11 @@
-import { createHmac, timingSafeEqual } from "crypto";
+import { createHmac, timingSafeEqual, randomUUID } from "crypto";
 
 const SECRET = process.env.SESSION_SECRET || "dev-only-insecure-session-secret-change-in-production";
 const TOKEN_TTL_MS = 30 * 24 * 60 * 60 * 1000; // 30 days — same-device sessions, not high-security banking
 
-interface TokenPayload {
+export interface TokenPayload {
   userId: string;
+  jti: string; // unique token id — lets a specific token be revoked (logout/refresh)
   exp: number;
 }
 
@@ -13,16 +14,18 @@ interface TokenPayload {
  * new dependency, no session store to keep in sync across the KV migration.
  * Same shape as a JWT without the extra library: base64url(payload) +
  * "." + signature, so it can't be tampered with client-side without the
- * signature check failing.
+ * signature check failing. Each token carries a random `jti` so it can be
+ * individually revoked via the token-revocation list (logout / refresh).
  */
 export function issueToken(userId: string): string {
-  const payload: TokenPayload = { userId, exp: Date.now() + TOKEN_TTL_MS };
+  const payload: TokenPayload = { userId, jti: randomUUID(), exp: Date.now() + TOKEN_TTL_MS };
   const encoded = base64url(JSON.stringify(payload));
   const signature = sign(encoded);
   return `${encoded}.${signature}`;
 }
 
-export function verifyToken(token: string): string | null {
+/** Verify signature + expiry and return the full payload (jti included). */
+export function verifyTokenFull(token: string): TokenPayload | null {
   const [encoded, signature] = token.split(".");
   if (!encoded || !signature) return null;
 
@@ -32,10 +35,15 @@ export function verifyToken(token: string): string | null {
   try {
     const payload = JSON.parse(base64urlDecode(encoded)) as TokenPayload;
     if (payload.exp < Date.now()) return null;
-    return payload.userId;
+    return payload;
   } catch {
     return null;
   }
+}
+
+/** Backward-compatible helper: returns just the userId (no revocation check). */
+export function verifyToken(token: string): string | null {
+  return verifyTokenFull(token)?.userId ?? null;
 }
 
 function sign(data: string): string {

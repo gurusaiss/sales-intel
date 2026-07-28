@@ -111,8 +111,23 @@ export async function loginUser(email: string, password: string): Promise<AuthUs
   return data.user;
 }
 
-export function logoutUser(): void {
+export async function logoutUser(): Promise<void> {
+  // Best-effort server-side revocation, then clear the local token regardless.
+  try {
+    await fetch(`${API_BASE}/api/auth/logout`, { method: "POST", headers: authHeaders() });
+  } catch {
+    /* offline or backend down — still clear locally */
+  }
   setSessionToken(null);
+}
+
+/** Rotate the current session token; returns the new token or null if invalid. */
+export async function refreshSession(): Promise<string | null> {
+  const res = await fetch(`${API_BASE}/api/auth/refresh`, { method: "POST", headers: authHeaders() });
+  if (!res.ok) { setSessionToken(null); return null; }
+  const data = await handleResponse<{ token: string }>(res);
+  setSessionToken(data.token);
+  return data.token;
 }
 
 export async function fetchCurrentUser(): Promise<{ userId: string; loggedIn: boolean }> {
