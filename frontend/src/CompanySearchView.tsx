@@ -198,8 +198,8 @@ export default function CompanySearchView() {
         </button>
       </form>
       <p className="form-hint">
-        Sourced from a compliant data provider (Hunter/Snov domain search), never from scraping
-        LinkedIn's own search or company pages.
+        Uses Hunter.io/Snov.io domain search when configured, otherwise falls back to real-time
+        web search — never scrapes LinkedIn's own search or company pages directly.
       </p>
 
       {error && <div className="error-banner">{error}</div>}
@@ -215,7 +215,11 @@ export default function CompanySearchView() {
           </div>
 
           {result.people.length === 0 ? (
-            <p className="subline">No candidates found for this domain.</p>
+            <p className="subline">
+              {result.source === "web-search-no-results"
+                ? "No public LinkedIn profiles surfaced by web search for this company. For reliable people search, configure a Hunter.io or Snov.io API key on the backend."
+                : "No candidates found for this domain."}
+            </p>
           ) : (
             <>
               <div className="search-form" style={{ marginTop: 0 }}>

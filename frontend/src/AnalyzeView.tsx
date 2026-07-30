@@ -122,7 +122,7 @@ export default function AnalyzeView() {
           setPolling(false);
           if (data.status === "done") {
             toast("Analysis complete!", "success");
-            apiFetch("/analyze/" + data.id + "/contacts")
+            apiFetch(`/analyze/${data.id}/contacts`)
               .then((d) => setContacts(d.contacts))
               .catch(() => {});
           } else {
@@ -137,7 +137,15 @@ export default function AnalyzeView() {
     if (!analysis) return;
     setSaving(true);
     try {
-      await apiFetch("/analyze/" + analysis.id + "/bookmark", { method: "POST" });
+      await apiFetch("/me/bookmarks", {
+        method: "POST",
+        body: JSON.stringify({
+          contentType: "analysis",
+          contentId: analysis.id,
+          title: ai?.company_name ?? analysis.pageTitle ?? analysis.url,
+          url: analysis.url,
+        }),
+      });
       toast("Saved to bookmarks!", "success");
     } catch (err) {
       toast("Could not save: " + (err instanceof Error ? err.message : "Unknown error"), "error");
@@ -146,11 +154,35 @@ export default function AnalyzeView() {
     }
   }
 
-  function downloadUrl(format: "json" | "csv" | "md") {
-    if (!analysis) return "#";
+  const DOWNLOAD_EXT: Record<"json" | "csv" | "markdown" | "pdf", string> = { json: "json", csv: "csv", markdown: "md", pdf: "pdf" };
+
+  /**
+   * A plain <a href> download can't carry the auth header (x-api-key /
+   * bearer token), so — same fix as api.ts's downloadExport — fetch the file
+   * as an authenticated blob and trigger the save manually instead of a
+   * query-string token (which resolveUser never reads).
+   */
+  async function downloadFile(format: "json" | "csv" | "markdown" | "pdf") {
+    if (!analysis) return;
     const token = localStorage.getItem("sessionToken");
-    const base = `${API_BASE}/analyze/${analysis.id}/download/${format}`;
-    return token ? `${base}?token=${encodeURIComponent(token)}` : base;
+    const headers: Record<string, string> = {};
+    if (API_KEY) headers["x-api-key"] = API_KEY;
+    if (token) headers["authorization"] = `Bearer ${token}`;
+    try {
+      const res = await fetch(`${API_BASE}/analyze/${analysis.id}/download/${format}`, { headers });
+      if (!res.ok) throw new Error(`Download failed (${res.status})`);
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = `analysis-${analysis.url.replace(/^https?:\/\//, "").replace(/[^a-z0-9.-]/gi, "_")}.${DOWNLOAD_EXT[format]}`;
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      URL.revokeObjectURL(url);
+    } catch (err) {
+      toast("Download failed: " + (err instanceof Error ? err.message : "Unknown error"), "error");
+    }
   }
 
   const ai = analysis?.aiResult;
@@ -365,33 +397,10 @@ export default function AnalyzeView() {
                   <div className="contacts-card-header">
                     <span className="card-label" style={{ margin: 0 }}>Extracted Contacts</span>
                     <div className="download-btn-row">
-                      <a
-                        className="btn-secondary btn-sm"
-                        href={downloadUrl("json")}
-                        download
-                        target="_blank"
-                        rel="noopener noreferrer"
-                      >
-                        JSON
-                      </a>
-                      <a
-                        className="btn-secondary btn-sm"
-                        href={downloadUrl("csv")}
-                        download
-                        target="_blank"
-                        rel="noopener noreferrer"
-                      >
-                        CSV
-                      </a>
-                      <a
-                        className="btn-secondary btn-sm"
-                        href={downloadUrl("md")}
-                        download
-                        target="_blank"
-                        rel="noopener noreferrer"
-                      >
-                        Markdown
-                      </a>
+                      <button className="btn-secondary btn-sm" onClick={() => downloadFile("json")}>JSON</button>
+                      <button className="btn-secondary btn-sm" onClick={() => downloadFile("csv")}>CSV</button>
+                      <button className="btn-secondary btn-sm" onClick={() => downloadFile("markdown")}>Markdown</button>
+                      <button className="btn-secondary btn-sm" onClick={() => downloadFile("pdf")}>PDF</button>
                     </div>
                   </div>
 

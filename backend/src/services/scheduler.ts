@@ -2,7 +2,7 @@ import cron from "node-cron";
 import { pollAllSources } from "./newsPoller";
 import { summarizePendingArticles } from "./newsSummarizer";
 import { detectTrendsFromArticles, syncGithubTrending } from "./trendDetector";
-import { generateReport, generateAllScheduledReports } from "./reportGenerator";
+import { generateReport } from "./reportGenerator";
 import { fetchPackageStats } from "./packageStats";
 import { readJson, writeJson } from "./kvStore";
 import { pollDiscoverSources } from "./discoverPoller";

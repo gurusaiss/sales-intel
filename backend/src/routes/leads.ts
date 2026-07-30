@@ -3,11 +3,16 @@ import { z } from "zod";
 import { searchCompanyPeople } from "../services/enrichment";
 import { addLeads, deleteLead, listLeads, updateLead, VALID_STATUSES } from "../services/leadStore";
 import { requireApiKey } from "../middleware/apiKey";
+import { createRateLimit } from "../middleware/rateLimit";
 import { classifyRole, leadershipRank } from "../services/roleClassifier";
 
 const TIER_ORDER = { leadership: 0, hiring: 1, employee: 2, unclassified: 3 } as const;
 
 const router = Router();
+
+// Falls through to a real web search + scrape when no Hunter/Snov key is
+// configured (see enrichment.ts) — same cost profile as /search.
+const companySearchLimiter = createRateLimit(30, 3_600_000);
 
 const companySearchSchema = z.object({
   company: z.string().trim().min(1),
@@ -18,12 +23,13 @@ const companySearchSchema = z.object({
 });
 
 /**
- * "Enter a company, find relevant professionals" — always sourced from a
- * compliant data provider (Hunter/Snov domain search, or the mock fallback),
- * never from scraping LinkedIn's own search or company pages directly.
- * Returns candidates only; nothing is saved until the user picks who to add.
+ * "Enter a company, find relevant professionals" — sourced from Hunter/Snov
+ * domain search when a paid key is configured, otherwise from a real-time web
+ * search (see enrichment.ts's realCompanySearch) that reads public search
+ * result snippets rather than scraping LinkedIn's site directly. Returns
+ * candidates only; nothing is saved until the user picks who to add.
  */
-router.post("/company-search", requireApiKey, async (req, res) => {
+router.post("/company-search", requireApiKey, companySearchLimiter, async (req, res) => {
   const parsed = companySearchSchema.safeParse(req.body);
   if (!parsed.success) {
     return res.status(400).json({ error: parsed.error.issues[0]?.message ?? "Invalid request" });

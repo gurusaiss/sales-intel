@@ -11,14 +11,17 @@ const VALID_TYPES = Object.keys(REPORT_PROMPTS) as ReportType[];
 router.get("/reports", requireApiKey, async (req, res) => {
   try {
     const type = req.query.type as ReportType | undefined;
+    if (type && !VALID_TYPES.includes(type)) return res.status(400).json({ error: "Invalid report type" });
     const reports = await listReports(type);
-    // Cold start: no reports yet. Reports are AI-generated from articles, so
-    // make sure articles exist, then kick off a daily report in the background.
-    // It'll be ready on the next load (requires an AI key to be configured).
+    // Cold start: no reports yet for the requested type (or none at all). Reports
+    // are AI-generated from articles, so make sure articles exist, then kick off
+    // generation in the background for the ACTUAL type being viewed — a bug here
+    // previously always regenerated "daily" even when viewing e.g. ?type=weekly,
+    // so weekly/founder/etc. reports never populated at all.
     if (reports.length === 0) {
       void (async () => {
         await ensureNews();
-        await generateReport("daily").catch(() => {});
+        await generateReport(type ?? "daily").catch(() => {});
       })();
     }
     res.json({ reports });

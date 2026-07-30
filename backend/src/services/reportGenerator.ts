@@ -21,7 +21,14 @@ export async function generateReport(type: ReportType): Promise<void> {
   }
   const articlesText = formatArticlesForPrompt(relevant);
   const prompt = config.prompt.replace("{articles}", articlesText);
-  const content = await callAI(prompt, REPORT_SYSTEM, 2000);
+  let content = await callAI(prompt, REPORT_SYSTEM, 2000);
+  if (!content) {
+    // One retry with a smaller article batch — cheaper and more likely to
+    // succeed than the full batch if the first attempt hit a transient
+    // provider error or rate limit.
+    const smallerPrompt = config.prompt.replace("{articles}", formatArticlesForPrompt(relevant.slice(0, 15)));
+    content = await callAI(smallerPrompt, REPORT_SYSTEM, 2000);
+  }
   if (!content) { console.warn(`[reportGenerator] AI returned null for ${type}`); return; }
   const now = new Date();
   await saveReport({
@@ -34,9 +41,4 @@ export async function generateReport(type: ReportType): Promise<void> {
     generatedAt: now.toISOString(),
   });
   console.log(`[reportGenerator] Generated ${type} report from ${relevant.length} articles`);
-}
-
-export async function generateAllScheduledReports(): Promise<void> {
-  const types: ReportType[] = ["daily", "sales_digest"];
-  for (const t of types) await generateReport(t).catch((e) => console.error(e));
 }

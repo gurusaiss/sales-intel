@@ -6,8 +6,14 @@ import { fetchGrowthSignals } from "../services/newsSignals";
 import { detectTechStack, flattenTechStack } from "../services/techStack";
 import { ResearchResponse } from "../types";
 import { requireApiKey } from "../middleware/apiKey";
+import { createRateLimit } from "../middleware/rateLimit";
 
 const router = Router();
+
+// Each search now does a real web search + scrape + AI call (see enrichment.ts)
+// instead of an instant mock lookup — genuinely expensive, so it gets its own
+// budget rather than relying solely on the generic global rate limit.
+const searchLimiter = createRateLimit(30, 3_600_000);
 
 const searchSchema = z.object({
   query: z.string().trim().min(2, "Query must be at least 2 characters"),
@@ -19,7 +25,7 @@ const searchSchema = z.object({
     .or(z.literal("")),
 });
 
-router.post("/search", requireApiKey, async (req, res) => {
+router.post("/search", requireApiKey, searchLimiter, async (req, res) => {
   const parsed = searchSchema.safeParse(req.body);
   if (!parsed.success) {
     return res.status(400).json({ error: parsed.error.issues[0]?.message ?? "Invalid request" });
