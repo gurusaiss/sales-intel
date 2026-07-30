@@ -8,6 +8,7 @@ import CareerView from "./CareerView";
 import AuthBar from "./AuthBar";
 import HistoryView from "./HistoryView";
 import AnalyzeView from "./AnalyzeView";
+import DashboardView from "./DashboardView";
 import NewsAndTrendsView from "./NewsAndTrendsView";
 import DiscoverView from "./DiscoverView";
 import ReportsView from "./ReportsView";
@@ -16,9 +17,10 @@ import SavedView from "./SavedView";
 import { ToastContainer } from "./components/Toast";
 import "./App.css";
 
-type Tab = "research" | "companies" | "analyze" | "newstrends" | "discover" | "reports" | "search" | "saved" | "queue" | "analytics" | "career" | "history";
+type Tab = "home" | "research" | "companies" | "analyze" | "newstrends" | "discover" | "reports" | "search" | "saved" | "queue" | "analytics" | "career" | "history";
 
 const PAGE_TITLES: Record<Tab, string> = {
+  home: "Overview",
   research: "Research",
   companies: "Company Search",
   analyze: "Website Analyzer",
@@ -34,6 +36,10 @@ const PAGE_TITLES: Record<Tab, string> = {
 };
 
 const NAV_GROUPS: { label: string; items: { id: Tab; label: string; icon: string }[] }[] = [
+  {
+    label: "Home",
+    items: [{ id: "home", label: "Overview", icon: "grid" }],
+  },
   {
     label: "Intelligence",
     items: [
@@ -67,6 +73,7 @@ const NAV_GROUPS: { label: string; items: { id: Tab; label: string; icon: string
 ];
 
 const ICON_PATHS: Record<string, string> = {
+  grid: "M3 3h7v7H3zM14 3h7v7h-7zM14 14h7v7h-7zM3 14h7v7H3z",
   news: "M4 22h16a2 2 0 0 0 2-2V4a2 2 0 0 0-2-2H8a2 2 0 0 0-2 2v16a2 2 0 0 1-2 2Zm0 0a2 2 0 0 1-2-2v-9c0-1.1.9-2 2-2h2M18 14h-8M15 18h-5M10 6h8v4h-8V6Z",
   compass: "M12 22a10 10 0 1 0 0-20 10 10 0 0 0 0 20ZM16.24 7.76l-2.12 6.36-6.36 2.12 2.12-6.36 6.36-2.12Z",
   file: "M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8l-6-6Zm0 0v6h6M9 13h6M9 17h6",
@@ -90,7 +97,7 @@ function NavIcon({ name }: { name: string }) {
 }
 
 function App() {
-  const [tab, setTab] = useState<Tab>("newstrends");
+  const [tab, setTab] = useState<Tab>("home");
   const [navOpen, setNavOpen] = useState(false);
   const [query, setQuery] = useState("");
   const [domain, setDomain] = useState("");
@@ -192,7 +199,9 @@ function App() {
         </header>
 
         <main className="main-content" key={tab}>
-          {tab === "research" ? (
+          {tab === "home" ? (
+            <DashboardView onNavigate={(t) => go(t as Tab)} />
+          ) : tab === "research" ? (
             <>
               <form className="search-form" onSubmit={handleSubmit}>
                 <input
