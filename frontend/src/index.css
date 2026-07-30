@@ -1,40 +1,132 @@
-/* ── Theme tokens ── */
+/* =========================================================================
+   Sales-Intel — unified design system
+   One source of truth for every view. Canonical tokens are redefined per
+   theme; all legacy (--ink/--paper/--card…) and per-view (--color-*) names
+   are aliases that resolve to the canonical tokens, so old class names and
+   inline component styles automatically adopt this palette.
+   ========================================================================= */
+
+@import url("https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap");
+
 :root {
-  --bg: #ffffff;
-  --surface: #f8fafc;
-  --border: #e2e8f0;
-  --text: #0f172a;
-  --muted: #64748b;
-  --accent: #2563eb;
-  --accent-hover: #1d4ed8;
-  --skeleton-base: #e2e8f0;
-  --skeleton-shine: #f8fafc;
+  /* ---- canonical palette (LIGHT) ---- */
+  --bg: #f7f7fb;
+  --surface: #ffffff;
+  --surface-2: #f3f3f8;
+  --surface-3: #e9e9f1;
+  --border: #e8e8f0;
+  --border-strong: #d5d5e0;
+  --text: #16161d;
+  --muted: #6a6a7c;
+  --primary: #6366f1;
+  --primary-hover: #5558e3;
+  --primary-dark: #4f46e5;
+  --primary-light: #eef0ff;
+  --on-primary: #ffffff;
+
+  --success: #16a34a;
+  --warning: #d97706;
+  --danger: #dc2626;
+  --info: #2563eb;
+
+  /* ---- elevation ---- */
+  --shadow-sm: 0 1px 2px rgba(20, 20, 40, 0.06), 0 1px 3px rgba(20, 20, 40, 0.05);
+  --shadow-md: 0 4px 12px rgba(20, 20, 40, 0.08), 0 2px 4px rgba(20, 20, 40, 0.05);
+  --shadow-lg: 0 12px 32px rgba(20, 20, 40, 0.12), 0 4px 8px rgba(20, 20, 40, 0.06);
+  --ring: 0 0 0 3px color-mix(in srgb, var(--primary) 30%, transparent);
+
+  /* ---- shape / motion ---- */
+  --radius-sm: 8px;
+  --radius: 12px;
+  --radius-lg: 16px;
+  --radius-xl: 20px;
+  --sidebar-w: 250px;
+  --ease: cubic-bezier(0.4, 0, 0.2, 1);
+
+  /* ---- type ---- */
+  --sans: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  --mono: "SFMono-Regular", "JetBrains Mono", Consolas, "Liberation Mono", Menlo, monospace;
+
+  /* ---- legacy aliases (App.css classes) ---- */
+  --ink: var(--text);
+  --paper: var(--bg);
+  --card: var(--surface);
+  --accent: var(--primary);
+  --accent-hover: var(--primary-hover);
+  --accent-soft: var(--primary-light);
+  --text-muted: var(--muted);
+  --skeleton-base: var(--surface-2);
+  --skeleton-shine: var(--surface-3);
+
+  /* ---- per-view inline-style aliases (Discover/News/Reports/…) ---- */
+  --color-primary: var(--primary);
+  --color-primary-hover: var(--primary-hover);
+  --color-primary-dark: var(--primary-dark);
+  --color-primary-light: var(--primary-light);
+  --color-surface: var(--surface);
+  --color-surface-2: var(--surface-2);
+  --color-surface-3: var(--surface-3);
+  --color-bg: var(--bg);
+  --color-text: var(--text);
+  --color-text-muted: var(--muted);
+  --color-border: var(--border);
+
+  color-scheme: light;
 }
 
+/* ---- canonical palette (DARK) — explicit toggle ---- */
 [data-theme="dark"] {
-  --bg: #0f172a;
-  --surface: #1e293b;
-  --border: #334155;
-  --text: #f1f5f9;
-  --muted: #94a3b8;
-  --accent: #3b82f6;
-  --accent-hover: #60a5fa;
-  --skeleton-base: #1e293b;
-  --skeleton-shine: #334155;
+  --bg: #0a0a10;
+  --surface: #141420;
+  --surface-2: #1c1c2b;
+  --surface-3: #262639;
+  --border: #2a2a3a;
+  --border-strong: #3a3a4d;
+  --text: #f0f0f6;
+  --muted: #9595ab;
+  --primary: #818cf8;
+  --primary-hover: #939dff;
+  --primary-dark: #6366f1;
+  --primary-light: #1d1d33;
+  --on-primary: #0a0a10;
+
+  --success: #34d399;
+  --warning: #fbbf24;
+  --danger: #f87171;
+  --info: #60a5fa;
+
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.4);
+  --shadow-md: 0 4px 14px rgba(0, 0, 0, 0.45);
+  --shadow-lg: 0 16px 40px rgba(0, 0, 0, 0.55);
+
+  color-scheme: dark;
 }
 
+/* ---- canonical palette (DARK) — follow system when no explicit choice ---- */
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) {
-    --bg: #0f172a;
-    --surface: #1e293b;
-    --border: #334155;
-    --text: #f1f5f9;
-    --muted: #94a3b8;
-    --accent: #3b82f6;
-    --accent-hover: #60a5fa;
-    --skeleton-base: #1e293b;
-    --skeleton-shine: #334155;
+    --bg: #0a0a10;
+    --surface: #141420;
+    --surface-2: #1c1c2b;
+    --surface-3: #262639;
+    --border: #2a2a3a;
+    --border-strong: #3a3a4d;
+    --text: #f0f0f6;
+    --muted: #9595ab;
+    --primary: #818cf8;
+    --primary-hover: #939dff;
+    --primary-dark: #6366f1;
+    --primary-light: #1d1d33;
+    --on-primary: #0a0a10;
+    --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.4);
+    --shadow-md: 0 4px 14px rgba(0, 0, 0, 0.45);
+    --shadow-lg: 0 16px 40px rgba(0, 0, 0, 0.55);
+    color-scheme: dark;
   }
+}
+
+* {
+  box-sizing: border-box;
 }
 
 html,
@@ -47,5 +139,50 @@ body {
   margin: 0;
   background: var(--bg);
   color: var(--text);
-  transition: background 0.2s, color 0.2s;
+  font-family: var(--sans);
+  font-size: 15px;
+  line-height: 1.55;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+  transition: background 0.25s var(--ease), color 0.25s var(--ease);
+}
+
+h1, h2, h3, h4 {
+  letter-spacing: -0.02em;
+  font-weight: 700;
+}
+
+a {
+  color: var(--primary);
+  text-decoration: none;
+}
+a:hover { text-decoration: underline; }
+
+::selection {
+  background: color-mix(in srgb, var(--primary) 25%, transparent);
+}
+
+/* refined scrollbars */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--border-strong) transparent;
+}
+*::-webkit-scrollbar { width: 10px; height: 10px; }
+*::-webkit-scrollbar-thumb {
+  background: var(--border-strong);
+  border-radius: 999px;
+  border: 3px solid transparent;
+  background-clip: padding-box;
+}
+*::-webkit-scrollbar-thumb:hover { background: var(--muted); background-clip: padding-box; }
+
+:focus-visible {
+  outline: none;
+  box-shadow: var(--ring);
+  border-radius: 6px;
+}
+
+@keyframes fade-in-up {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
 }

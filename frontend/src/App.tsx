@@ -18,8 +18,80 @@ import "./App.css";
 
 type Tab = "research" | "companies" | "analyze" | "newstrends" | "discover" | "reports" | "search" | "saved" | "queue" | "analytics" | "career" | "history";
 
+const PAGE_TITLES: Record<Tab, string> = {
+  research: "Research",
+  companies: "Company Search",
+  analyze: "Website Analyzer",
+  newstrends: "News & Trends",
+  discover: "Discover",
+  reports: "Reports",
+  search: "Search",
+  saved: "Saved",
+  queue: "Outreach Queue",
+  analytics: "Analytics",
+  career: "Career Tools",
+  history: "History",
+};
+
+const NAV_GROUPS: { label: string; items: { id: Tab; label: string; icon: string }[] }[] = [
+  {
+    label: "Intelligence",
+    items: [
+      { id: "newstrends", label: "News & Trends", icon: "news" },
+      { id: "discover", label: "Discover", icon: "compass" },
+      { id: "reports", label: "Reports", icon: "file" },
+      { id: "search", label: "Search", icon: "search" },
+    ],
+  },
+  {
+    label: "Prospecting",
+    items: [
+      { id: "research", label: "Research", icon: "target" },
+      { id: "companies", label: "Companies", icon: "building" },
+      { id: "analyze", label: "Analyze Site", icon: "globe" },
+    ],
+  },
+  {
+    label: "Pipeline",
+    items: [
+      { id: "queue", label: "Queue", icon: "inbox" },
+      { id: "saved", label: "Saved", icon: "bookmark" },
+      { id: "analytics", label: "Analytics", icon: "chart" },
+      { id: "history", label: "History", icon: "clock" },
+    ],
+  },
+  {
+    label: "Toolkit",
+    items: [{ id: "career", label: "Career", icon: "briefcase" }],
+  },
+];
+
+const ICON_PATHS: Record<string, string> = {
+  news: "M4 22h16a2 2 0 0 0 2-2V4a2 2 0 0 0-2-2H8a2 2 0 0 0-2 2v16a2 2 0 0 1-2 2Zm0 0a2 2 0 0 1-2-2v-9c0-1.1.9-2 2-2h2M18 14h-8M15 18h-5M10 6h8v4h-8V6Z",
+  compass: "M12 22a10 10 0 1 0 0-20 10 10 0 0 0 0 20ZM16.24 7.76l-2.12 6.36-6.36 2.12 2.12-6.36 6.36-2.12Z",
+  file: "M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8l-6-6Zm0 0v6h6M9 13h6M9 17h6",
+  search: "M11 19a8 8 0 1 0 0-16 8 8 0 0 0 0 16ZM21 21l-4.35-4.35",
+  target: "M12 22a10 10 0 1 0 0-20 10 10 0 0 0 0 20Zm0-4a6 6 0 1 0 0-12 6 6 0 0 0 0 12Zm0-4a2 2 0 1 0 0-4 2 2 0 0 0 0 4Z",
+  building: "M6 22V4a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v18M2 22h20M10 6h4M10 10h4M10 14h4",
+  globe: "M12 22a10 10 0 1 0 0-20 10 10 0 0 0 0 20ZM2 12h20M12 2a15 15 0 0 1 0 20 15 15 0 0 1 0-20Z",
+  inbox: "M22 12h-6l-2 3h-4l-2-3H2M5.45 5.11 2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11Z",
+  bookmark: "M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2v16Z",
+  chart: "M3 3v18h18M18 17V9M13 17V5M8 17v-3",
+  clock: "M12 22a10 10 0 1 0 0-20 10 10 0 0 0 0 20ZM12 6v6l4 2",
+  briefcase: "M20 7h-16a2 2 0 0 0-2 2v10a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2ZM16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16",
+};
+
+function NavIcon({ name }: { name: string }) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d={ICON_PATHS[name] ?? ""} />
+    </svg>
+  );
+}
+
 function App() {
-  const [tab, setTab] = useState<Tab>("research");
+  const [tab, setTab] = useState<Tab>("newstrends");
+  const [navOpen, setNavOpen] = useState(false);
   const [query, setQuery] = useState("");
   const [domain, setDomain] = useState("");
   const [loading, setLoading] = useState(false);
@@ -64,138 +136,124 @@ function App() {
     }
   }
 
+  function go(id: Tab) {
+    setTab(id);
+    setNavOpen(false);
+  }
+
   return (
-    <div className="app">
-      <header className="app-header">
-        <span className="eyebrow">Sales Intelligence — Research MVP</span>
-        <button className="theme-toggle" onClick={() => setDarkMode((d) => !d)} aria-label="Toggle theme">
-          {darkMode ? "☀" : "☾"}
-        </button>
-        <AuthBar />
-        <h1>
-          {tab === "research"
-            ? "Look up a person or company"
-            : tab === "companies"
-              ? "Find people at a company"
-              : tab === "queue"
-                ? "Outreach queue"
-                : tab === "career"
-                  ? "Career tools"
-                  : tab === "history"
-                    ? "History"
-                    : "Analytics"}
-        </h1>
-        <nav className="tab-row" aria-label="View">
-          <button
-            className={`tab-button ${tab === "research" ? "active" : ""}`}
-            onClick={() => setTab("research")}
-          >
-            Research
-          </button>
-          <button
-            className={`tab-button ${tab === "companies" ? "active" : ""}`}
-            onClick={() => setTab("companies")}
-          >
-            Companies
-          </button>
-          <button
-            className={`tab-button ${tab === "queue" ? "active" : ""}`}
-            onClick={() => setTab("queue")}
-          >
-            Queue
-          </button>
-          <button
-            className={`tab-button ${tab === "career" ? "active" : ""}`}
-            onClick={() => setTab("career")}
-          >
-            Career
-          </button>
-          <button
-            className={`tab-button ${tab === "history" ? "active" : ""}`}
-            onClick={() => setTab("history")}
-          >
-            History
-          </button>
-          <button
-            className={`tab-button ${tab === "analytics" ? "active" : ""}`}
-            onClick={() => setTab("analytics")}
-          >
-            Analytics
-          </button>
-          <button className={`tab-button ${tab === "analyze" ? "active" : ""}`} onClick={() => setTab("analyze")}>Analyze</button>
-          <button className={`tab-button ${tab === "newstrends" ? "active" : ""}`} onClick={() => setTab("newstrends")}>News & Trends</button>
-          <button className={`tab-button ${tab === "discover" ? "active" : ""}`} onClick={() => setTab("discover")}>Discover</button>
-          <button className={`tab-button ${tab === "reports" ? "active" : ""}`} onClick={() => setTab("reports")}>Reports</button>
-          <button className={`tab-button ${tab === "search" ? "active" : ""}`} onClick={() => setTab("search")}>Search</button>
-          <button className={`tab-button ${tab === "saved" ? "active" : ""}`} onClick={() => setTab("saved")}>Saved</button>
-        </nav>
+    <div className="app-shell">
+      {navOpen && <div className="scrim" onClick={() => setNavOpen(false)} />}
 
-        {tab === "research" && (
-          <>
-            <form className="search-form" onSubmit={handleSubmit}>
-              <input
-                type="text"
-                value={query}
-                onChange={(e) => setQuery(e.target.value)}
-                placeholder="e.g. John Doe or Northwind Analytics Inc."
-                aria-label="Search query"
-                className="query-input"
-              />
-              <input
-                type="text"
-                value={domain}
-                onChange={(e) => setDomain(e.target.value)}
-                placeholder="Company domain (optional) — acme.com"
-                aria-label="Company domain"
-                className="domain-input"
-              />
-              <button type="submit" disabled={loading}>
-                {loading ? "Researching…" : "Research"}
+      <aside className={`sidebar ${navOpen ? "open" : ""}`}>
+        <div className="brand">
+          <div className="brand-mark">Si</div>
+          <div>
+            <div className="brand-name">Sales-Intel</div>
+            <div className="brand-sub">Intelligence Platform</div>
+          </div>
+        </div>
+
+        {NAV_GROUPS.map((group) => (
+          <div className="nav-group" key={group.label}>
+            <div className="nav-group-label">{group.label}</div>
+            {group.items.map((item) => (
+              <button
+                key={item.id}
+                className={`nav-item ${tab === item.id ? "active" : ""}`}
+                onClick={() => go(item.id)}
+                aria-current={tab === item.id ? "page" : undefined}
+              >
+                <NavIcon name={item.icon} />
+                <span>{item.label}</span>
               </button>
-            </form>
-            <p className="form-hint">
-              {domain.trim()
-                ? "Domain provided — this search will use real Hunter.io data if HUNTER_API_KEY is set."
-                : "No domain — this search uses mock data. Add a company domain for real Hunter.io lookups."}
-            </p>
-          </>
-        )}
-      </header>
+            ))}
+          </div>
+        ))}
 
-      {tab === "research" ? (
-        <>
-          {error && <div className="error-banner">{error}</div>}
-          {result && <ResultView result={result} linkedPerson={linkedPerson} />}
-          {!result && !error && !loading && (
-            <p className="empty-state">
-              Enter a name or company to generate a research profile, AI summary, and a draft
-              outreach email.
-            </p>
+        <div className="sidebar-footer">
+          <AuthBar />
+        </div>
+      </aside>
+
+      <div className="main-col">
+        <header className="topbar">
+          <div style={{ display: "flex", alignItems: "center", gap: "0.6rem" }}>
+            <button className="nav-toggle" onClick={() => setNavOpen((o) => !o)} aria-label="Toggle navigation">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M3 12h18M3 6h18M3 18h18" /></svg>
+            </button>
+            <h1 className="topbar-title">{PAGE_TITLES[tab]}</h1>
+          </div>
+          <div className="topbar-actions">
+            <button className="theme-toggle" onClick={() => setDarkMode((d) => !d)} aria-label="Toggle theme">
+              {darkMode ? "☀" : "☾"}
+            </button>
+          </div>
+        </header>
+
+        <main className="main-content" key={tab}>
+          {tab === "research" ? (
+            <>
+              <form className="search-form" onSubmit={handleSubmit}>
+                <input
+                  type="text"
+                  value={query}
+                  onChange={(e) => setQuery(e.target.value)}
+                  placeholder="e.g. John Doe or Northwind Analytics Inc."
+                  aria-label="Search query"
+                  className="query-input"
+                />
+                <input
+                  type="text"
+                  value={domain}
+                  onChange={(e) => setDomain(e.target.value)}
+                  placeholder="Company domain (optional) — acme.com"
+                  aria-label="Company domain"
+                  className="domain-input"
+                />
+                <button type="submit" disabled={loading}>
+                  {loading ? "Researching…" : "Research"}
+                </button>
+              </form>
+              <p className="form-hint">
+                {domain.trim()
+                  ? "Domain provided — this search will use real Hunter.io data if HUNTER_API_KEY is set."
+                  : "No domain — this search uses mock data. Add a company domain for real Hunter.io lookups."}
+              </p>
+              {error && <div className="error-banner">{error}</div>}
+              {result && <ResultView result={result} linkedPerson={linkedPerson} />}
+              {!result && !error && !loading && (
+                <p className="empty-state">
+                  Enter a name or company to generate a research profile, AI summary, and a draft
+                  outreach email.
+                </p>
+              )}
+            </>
+          ) : tab === "companies" ? (
+            <CompanySearchView />
+          ) : tab === "queue" ? (
+            <QueueView />
+          ) : tab === "career" ? (
+            <CareerView />
+          ) : tab === "history" ? (
+            <HistoryView />
+          ) : tab === "analyze" ? (
+            <AnalyzeView />
+          ) : tab === "newstrends" ? (
+            <NewsAndTrendsView />
+          ) : tab === "discover" ? (
+            <DiscoverView />
+          ) : tab === "reports" ? (
+            <ReportsView />
+          ) : tab === "search" ? (
+            <SearchView />
+          ) : tab === "saved" ? (
+            <SavedView />
+          ) : (
+            <AnalyticsView />
           )}
-        </>
-      ) : tab === "companies" ? (
-        <CompanySearchView />
-      ) : tab === "queue" ? (
-        <QueueView />
-      ) : tab === "career" ? (
-        <CareerView />
-      ) : tab === "history" ? (
-        <HistoryView />
-      ) : tab === "analyze" ? (
-        <AnalyzeView />
-      ) : tab === "newstrends" ? (
-        <NewsAndTrendsView />
-      ) : tab === "discover" ? (
-        <DiscoverView />
-      ) : tab === "reports" ? (
-        <ReportsView />
-      ) : tab === "search" ? (
-        <SearchView />
-      ) : tab === "saved" ? (
-        <SavedView />
-      ) : (
-        <AnalyticsView />
-      )}
+        </main>
+      </div>
       <ToastContainer />
     </div>
   );

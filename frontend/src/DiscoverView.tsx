@@ -816,35 +816,9 @@ export default function DiscoverView() {
           .type-chips { gap: 6px; }
           .type-chip { font-size: 0.78rem; padding: 4px 11px; }
         }
-        @media (prefers-color-scheme: dark) {
-          .discover-title { color: #f1f5f9; }
-          .discover-subtitle { color: #94a3b8; }
-          .discover-search {
-            background: #1e293b;
-            border-color: #334155;
-            color: #f1f5f9;
-          }
-          .type-chip {
-            background: #1e293b;
-            border-color: #334155;
-            color: #cbd5e1;
-          }
-          .discover-card {
-            background: #1e293b;
-            border-color: #334155;
-          }
-          .card-name { color: #f1f5f9; }
-          .card-desc { color: #94a3b8; }
-          .lang-tag { background: #334155; color: #94a3b8; }
-          .total-stars { background: #334155; color: #94a3b8; }
-          .impact-bar-bg { background: #334155; }
-          .btn-github { background: #334155; border-color: #475569; color: #e2e8f0; }
-          .btn-github:hover { background: #475569; }
-          .discover-empty h3 { color: #e2e8f0; }
-          .discover-empty { color: #94a3b8; }
-          .page-btn { background: #1e293b; border-color: #334155; color: #cbd5e1; }
-          .skeleton { background: linear-gradient(90deg, #1e293b 25%, #273549 50%, #1e293b 75%); background-size: 200% 100%; }
-        }
+        /* Dark mode is handled by the global design tokens (--color-*), which
+           flip with the manual theme toggle. No prefers-color-scheme override
+           here — that would ignore the toggle and desync from the app shell. */
       `}</style>
     </div>
   );
