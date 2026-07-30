@@ -1,105 +1,148 @@
 import { EnrichmentResult } from "../types";
 import { HunterEnrichmentProvider } from "./providers/hunter";
 import { SnovEnrichmentProvider } from "./providers/snov";
-import { CompanySearchResult } from "../types/leads";
+import { CompanySearchResult, CandidateLead } from "../types/leads";
+import { webSearch, resolveCompanyDomain, isBlockedHost } from "./webSearch";
+import { scrape } from "./webScraper";
+import { callAI } from "./aiRouter";
+import { buildEnrichmentPrompt, ENRICHMENT_SYSTEM } from "../prompts/enrichmentPrompts";
 
 /**
- * Enrichment is provider-agnostic by design: swapping the mock provider for
- * a real one (People Data Labs, Coresignal, Datagma, etc.) means implementing
- * this interface — nothing else in the app changes.
+ * Enrichment is provider-agnostic by design: swapping providers (Hunter,
+ * Snov, or this default web-search provider) for a paid people-data API
+ * (People Data Labs, Coresignal, Datagma, etc.) means implementing this
+ * interface — nothing else in the app changes.
  */
 export interface EnrichmentProvider {
   name: string;
   lookup(query: string, domain?: string): Promise<EnrichmentResult>;
 }
 
-class MockEnrichmentProvider implements EnrichmentProvider {
-  name = "mock";
+/**
+ * Default provider when no paid enrichment API key is configured. Instead of
+ * a static template (the old MockEnrichmentProvider — same fake company/
+ * funding/tech-stack for every query), this does a real, query-specific
+ * lookup: free web search (DuckDuckGo) finds relevant real sources, the
+ * company's real site gets scraped when found, and an AI pass turns the real
+ * source material into a structured profile — grounded explicitly against
+ * inventing facts. Two different queries now produce two different, real
+ * answers instead of the same fake one.
+ */
+class WebSearchEnrichmentProvider implements EnrichmentProvider {
+  name = "web-search";
 
-  async lookup(query: string): Promise<EnrichmentResult> {
+  async lookup(query: string, domain?: string): Promise<EnrichmentResult> {
     const cleaned = query.trim();
     const looksLikeCompany = /(inc|llc|labs|technologies|co\.|corp)$/i.test(cleaned);
 
-    if (looksLikeCompany) {
+    let resolvedDomain = domain;
+    const sources: string[] = [];
+
+    if (!resolvedDomain && looksLikeCompany) {
+      const resolved = await resolveCompanyDomain(cleaned);
+      if (resolved) {
+        resolvedDomain = resolved.domain;
+        sources.push(resolved.url);
+      }
+    }
+
+    const searchQuery = looksLikeCompany || domain ? cleaned : `${cleaned} LinkedIn`;
+    const searchResults = await webSearch(searchQuery, 6);
+    for (const r of searchResults) if (!sources.includes(r.url)) sources.push(r.url);
+
+    let pageTitle: string | undefined;
+    let pageMetaDescription: string | undefined;
+    let pageText: string | undefined;
+
+    if (resolvedDomain) {
+      try {
+        const scraped = await scrape(`https://${resolvedDomain}`);
+        pageTitle = scraped.title;
+        pageMetaDescription = scraped.metaTags?.description;
+        pageText = scraped.text;
+        if (!sources.includes(`https://${resolvedDomain}`)) sources.push(`https://${resolvedDomain}`);
+      } catch {
+        // Site unreachable — proceed with search results only.
+      }
+    }
+
+    const prompt = buildEnrichmentPrompt({ query: cleaned, domain: resolvedDomain, searchResults, pageTitle, pageMetaDescription, pageText });
+    const aiRaw = await callAI(prompt, ENRICHMENT_SYSTEM, 1500);
+
+    const parsed = aiRaw ? parseEnrichmentJson(aiRaw) : null;
+    if (parsed?.company || parsed?.person) {
       return {
-        person: {
-          name: "Unknown — company search",
-        },
-        company: mockCompany(cleaned),
-        sources: ["mock-provider"],
+        person: parsed.person ?? { name: looksLikeCompany ? "Unknown — company search" : cleaned },
+        company: parsed.company,
+        sources: sources.length ? sources : ["web-search"],
       };
     }
 
-    return {
-      person: mockPerson(cleaned),
-      company: mockCompany(`${cleaned.split(" ")[0]}'s Company`),
-      sources: ["mock-provider"],
-    };
+    // AI unavailable or parse failed — fall back to what real search actually
+    // found, so results still vary per query instead of collapsing to a
+    // static template.
+    return buildFallbackFromSearch(cleaned, looksLikeCompany, resolvedDomain, searchResults, pageMetaDescription, sources);
   }
 }
 
-function mockPerson(name: string) {
+interface ParsedEnrichment {
+  person?: EnrichmentResult["person"];
+  company?: EnrichmentResult["company"];
+}
+
+function parseEnrichmentJson(raw: string): ParsedEnrichment | null {
+  try {
+    const fenced = raw.match(/```(?:json)?[\r\n]?([\s\S]*?)```/);
+    return JSON.parse((fenced ? fenced[1] : raw).trim()) as ParsedEnrichment;
+  } catch {
+    return null;
+  }
+}
+
+function buildFallbackFromSearch(
+  query: string,
+  looksLikeCompany: boolean,
+  domain: string | undefined,
+  searchResults: { title: string; url: string; snippet: string }[],
+  pageMetaDescription: string | undefined,
+  sources: string[]
+): EnrichmentResult {
+  const top = searchResults[0];
+  const description = pageMetaDescription || top?.snippet || undefined;
+
+  if (looksLikeCompany || domain) {
+    return {
+      person: { name: "Unknown — company search" },
+      company: {
+        name: query,
+        domain,
+        website: domain ? `https://${domain}` : top?.url,
+        description,
+      },
+      sources: sources.length ? sources : ["web-search"],
+    };
+  }
+
   return {
-    name,
-    title: "VP of Sales",
-    company: "Northwind Analytics",
-    location: "Austin, TX",
-    publicEmail: `${name.split(" ")[0]?.toLowerCase() ?? "contact"}@northwindanalytics.com`,
-    emailConfidence: "medium" as const,
-    socials: [
-      { platform: "LinkedIn", url: `https://www.linkedin.com/in/${slug(name)}` },
-    ],
-    bioSignals: [
-      "Spoke at SaaStr Annual 2025 on outbound sales efficiency",
-      "Guest on the 'Revenue Rebels' podcast, episode 142",
-    ],
+    person: { name: query, bioSignals: top ? [top.snippet].filter(Boolean) : [] },
+    company: description ? { name: "Unknown", description } : undefined,
+    sources: sources.length ? sources : ["web-search"],
   };
 }
 
-function mockCompany(name: string) {
-  return {
-    name,
-    domain: `${slug(name)}.com`,
-    website: `https://${slug(name)}.com`,
-    description: `${name} builds analytics tooling for mid-market revenue teams.`,
-    industry: "B2B SaaS",
-    employeeRange: "51-200",
-    founded: "2019",
-    funding: {
-      stage: "Series A",
-      totalRaised: "$14M",
-      lastRoundDate: "2025-03-01",
-      investors: ["Bessemer Venture Partners", "Uncork Capital"],
-    },
-    technologies: ["Salesforce", "Segment", "AWS", "React"],
-    socials: [
-      { platform: "LinkedIn", url: `https://www.linkedin.com/company/${slug(name)}` },
-      { platform: "Twitter", url: `https://twitter.com/${slug(name)}` },
-    ],
-    newsSignals: [
-      "Posted 4 open sales roles in the last 30 days",
-      "Announced Series A extension in Q1 2025",
-    ],
-  };
-}
-
-function slug(s: string): string {
-  return s.toLowerCase().replace(/[^a-z0-9]+/g, "");
-}
-
-const mockProvider = new MockEnrichmentProvider();
+const webProvider = new WebSearchEnrichmentProvider();
 
 export function getEnrichmentProvider(domain?: string): EnrichmentProvider {
-  // All real providers need a domain to do a real lookup. Without one, real
-  // results aren't possible, so we fall back to mock rather than guessing a
-  // domain and being wrong. Hunter takes priority if both keys are set.
+  // Hunter/Snov need a domain to do a real people-search lookup. Without a
+  // paid provider key, the web-search provider handles both cases (with or
+  // without a domain) using free search + scrape + AI.
   if (process.env.HUNTER_API_KEY && domain) {
     return new HunterEnrichmentProvider(process.env.HUNTER_API_KEY);
   }
   if (process.env.SNOV_CLIENT_ID && process.env.SNOV_CLIENT_SECRET && domain) {
     return new SnovEnrichmentProvider(process.env.SNOV_CLIENT_ID, process.env.SNOV_CLIENT_SECRET);
   }
-  return mockProvider;
+  return webProvider;
 }
 
 /**
@@ -133,30 +176,67 @@ export async function searchCompanyPeople(
       console.error("Snov company search failed, falling through to next provider", err);
     }
   }
-  return mockCompanySearch(companyName, domain);
+  return realCompanySearch(companyName, domain);
 }
 
-function mockCompanySearch(companyName: string, domain: string): CompanySearchResult {
-  const titles = ["Founder", "VP of Sales", "Head of Marketing", "Recruiter", "Engineering Manager"];
-  const firstNames = ["Alex", "Priya", "Jordan", "Sam", "Morgan"];
-  const lastNames = ["Rivera", "Chen", "Patel", "Kelly", "Nguyen"];
+/**
+ * No paid people-search API configured. Rather than fabricating five generic
+ * names for every company (the old mockCompanySearch — literally the same
+ * "Alex Rivera, Priya Chen, Jordan Patel…" for any input), this finds real
+ * public LinkedIn results via web search and scrapes the company's actual
+ * site for a real description. If no real profiles turn up, it returns an
+ * honest empty list rather than inventing people — a wrong "no one found" is
+ * far less harmful than a wrong invented name.
+ */
+async function realCompanySearch(companyName: string, domain: string): Promise<CompanySearchResult> {
+  let description: string | undefined;
+  let industry: string | undefined;
+
+  try {
+    const scraped = await scrape(`https://${domain}`);
+    description = scraped.metaTags?.description || scraped.title;
+  } catch {
+    // site unreachable — company info stays minimal
+  }
+
+  const results = await webSearch(`site:linkedin.com/in "${companyName}"`, 8);
+  const people: CandidateLead[] = [];
+  for (const r of results) {
+    if (isBlockedHost(r.url) && !r.url.includes("linkedin.com/in")) continue;
+    const parsed = parseLinkedInResultTitle(r.title);
+    if (!parsed) continue;
+    people.push({ name: parsed.name, title: parsed.title, sourceUrl: r.url, tier: "unclassified" });
+    if (people.length >= 6) break;
+  }
 
   return {
     company: {
       name: companyName,
       domain,
       website: `https://${domain}`,
-      description: `${companyName} builds tools for mid-market revenue teams.`,
-      industry: "B2B SaaS",
-      employeeRange: "51-200",
+      description,
+      industry,
       socials: [{ platform: "LinkedIn", url: `https://www.linkedin.com/company/${slug(companyName)}` }],
     },
-    people: titles.map((title, i) => ({
-      name: `${firstNames[i]} ${lastNames[i]}`,
-      title,
-      email: `${firstNames[i].toLowerCase()}.${lastNames[i].toLowerCase()}@${domain}`,
-      emailConfidence: "unverified" as const,
-    })),
-    source: "mock-provider",
+    people,
+    source: people.length > 0 ? "web-search" : "web-search-no-results",
   };
+}
+
+/**
+ * DuckDuckGo LinkedIn result titles typically look like
+ * "First Last - Job Title - Company | LinkedIn" or "First Last | LinkedIn".
+ * Best-effort split; returns null if it doesn't look like a person's name.
+ */
+function parseLinkedInResultTitle(title: string): { name: string; title?: string } | null {
+  const withoutSuffix = title.replace(/\s*\|\s*LinkedIn\s*$/i, "").trim();
+  const parts = withoutSuffix.split(" - ").map((p) => p.trim()).filter(Boolean);
+  if (parts.length === 0) return null;
+  const name = parts[0];
+  if (!/^[A-Z][a-zA-Z'.-]+(\s+[A-Z][a-zA-Z'.-]+){1,3}$/.test(name)) return null;
+  return { name, title: parts[1] };
+}
+
+function slug(s: string): string {
+  return s.toLowerCase().replace(/[^a-z0-9]+/g, "");
 }

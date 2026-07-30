@@ -22,9 +22,17 @@ async function get<T>(path: string, fallback: T): Promise<T> {
 }
 
 interface Article { id: string; title: string; sourceName: string; publishedAt: string; sentiment?: string; sourceCategory?: string; }
-interface Trend { id: string; name: string; category: string; trendScore: number; }
-interface Innovation { id: string; name: string; type: string; starsToday?: number; githubStars?: number; url: string; }
+interface Trend { id: string; name: string; category: string; trendScore: number; updatedAt?: string; }
+interface Innovation { id: string; name: string; type: string; starsToday?: number; githubStars?: number; url: string; discoveredAt?: string; }
 interface Report { id: string; title?: string; type?: string; content?: string; createdAt?: string; }
+
+const LAST_VISIT_KEY = "dashboardLastVisit";
+
+function isNewerThan(dateStr: string | undefined, sinceMs: number): boolean {
+  if (!dateStr) return false;
+  const t = new Date(dateStr).getTime();
+  return !isNaN(t) && t > sinceMs;
+}
 
 type Tab = "newstrends" | "discover" | "reports" | "search" | "analyze";
 
@@ -54,6 +62,8 @@ export default function DashboardView({ onNavigate }: { onNavigate?: (tab: Tab) 
   const [reports, setReports] = useState<Report[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [catchUp, setCatchUp] = useState<{ sinceMs: number; articles: number; trends: number; innovations: number; reports: number } | null>(null);
+  const [catchUpDismissed, setCatchUpDismissed] = useState(false);
 
   const load = useCallback(async () => {
     const [news, tr, inn, rep] = await Promise.all([
@@ -62,12 +72,38 @@ export default function DashboardView({ onNavigate }: { onNavigate?: (tab: Tab) 
       get<{ innovations: Innovation[]; total: number }>("/innovations?limit=50", { innovations: [], total: 0 }),
       get<{ reports: Report[] }>("/reports", { reports: [] }),
     ]);
-    setArticles(news.articles ?? []);
-    setTrends((tr.trends ?? []).slice().sort((a, b) => b.trendScore - a.trendScore));
-    setInnovations(inn.innovations ?? []);
-    setInnovationTotal(inn.total ?? (inn.innovations ?? []).length);
-    setReports(rep.reports ?? []);
+    const arts = news.articles ?? [];
+    const trs = (tr.trends ?? []).slice().sort((a, b) => b.trendScore - a.trendScore);
+    const innos = inn.innovations ?? [];
+    const reps = rep.reports ?? [];
+    setArticles(arts);
+    setTrends(trs);
+    setInnovations(innos);
+    setInnovationTotal(inn.total ?? innos.length);
+    setReports(reps);
     setLoading(false);
+
+    // Catch-up strip: compare against the last time this browser opened the
+    // dashboard. Read the previous timestamp BEFORE overwriting it, so the
+    // strip keeps showing "since X" for the rest of this session instead of
+    // instantly zeroing out once we stamp "now".
+    const prevVisit = localStorage.getItem(LAST_VISIT_KEY);
+    if (prevVisit) {
+      const sinceMs = new Date(prevVisit).getTime();
+      if (!isNaN(sinceMs)) {
+        const counts = {
+          sinceMs,
+          articles: arts.filter((a) => isNewerThan(a.publishedAt, sinceMs)).length,
+          trends: trs.filter((t) => isNewerThan(t.updatedAt, sinceMs)).length,
+          innovations: innos.filter((i) => isNewerThan(i.discoveredAt, sinceMs)).length,
+          reports: reps.filter((r) => isNewerThan(r.createdAt, sinceMs)).length,
+        };
+        if (counts.articles + counts.trends + counts.innovations + counts.reports > 0) {
+          setCatchUp(counts);
+        }
+      }
+    }
+    localStorage.setItem(LAST_VISIT_KEY, new Date().toISOString());
   }, []);
 
   useEffect(() => { void load(); }, [load]);
@@ -94,8 +130,26 @@ export default function DashboardView({ onNavigate }: { onNavigate?: (tab: Tab) 
     { label: "Reports", value: String(reports.length), sub: "AI-generated", accent: "var(--warning)", icon: "M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8l-6-6Zm0 0v6h6M9 13h6M9 17h6", tab: "reports" as Tab },
   ];
 
+  const catchUpParts: string[] = [];
+  if (catchUp) {
+    if (catchUp.articles > 0) catchUpParts.push(`${catchUp.articles} new article${catchUp.articles === 1 ? "" : "s"}`);
+    if (catchUp.trends > 0) catchUpParts.push(`${catchUp.trends} trend${catchUp.trends === 1 ? "" : "s"} moved`);
+    if (catchUp.innovations > 0) catchUpParts.push(`${catchUp.innovations} new innovation${catchUp.innovations === 1 ? "" : "s"}`);
+    if (catchUp.reports > 0) catchUpParts.push(`${catchUp.reports} new report${catchUp.reports === 1 ? "" : "s"}`);
+  }
+
   return (
     <div className="dash">
+      {catchUp && !catchUpDismissed && catchUpParts.length > 0 && (
+        <div className="catchup-strip">
+          <span className="catchup-icon">👋</span>
+          <span className="catchup-text">
+            <strong>Welcome back.</strong> Since {timeAgo(new Date(catchUp.sinceMs).toISOString())}: {catchUpParts.join(" · ")}.
+          </span>
+          <button className="catchup-close" onClick={() => setCatchUpDismissed(true)} aria-label="Dismiss">×</button>
+        </div>
+      )}
+
       <div className="dash-head">
         <div>
           <h2 className="dash-title">Intelligence Overview</h2>
@@ -230,6 +284,12 @@ export default function DashboardView({ onNavigate }: { onNavigate?: (tab: Tab) 
 
       <style>{`
         .dash { display: flex; flex-direction: column; gap: 1.25rem; }
+        .catchup-strip { display: flex; align-items: center; gap: 0.65rem; padding: 0.75rem 1rem; background: var(--primary-light); border: 1px solid color-mix(in srgb, var(--primary) 35%, var(--border)); border-radius: var(--radius); animation: fade-in-up 0.3s var(--ease); }
+        .catchup-icon { font-size: 1.1rem; flex-shrink: 0; }
+        .catchup-text { font-size: 0.86rem; color: var(--text); flex: 1; line-height: 1.4; }
+        .catchup-text strong { color: var(--primary-dark); }
+        .catchup-close { border: none; background: none; color: var(--muted); font-size: 1.15rem; line-height: 1; cursor: pointer; padding: 0.1rem 0.3rem; flex-shrink: 0; border-radius: 4px; }
+        .catchup-close:hover { color: var(--text); background: color-mix(in srgb, var(--primary) 12%, transparent); }
         .dash-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 1rem; flex-wrap: wrap; }
         .dash-title { font-size: 1.5rem; margin: 0 0 0.25rem; letter-spacing: -0.02em; }
         .dash-sub { color: var(--muted); font-size: 0.9rem; margin: 0; max-width: 60ch; }
