@@ -1,10 +1,15 @@
-import { callGroq } from "./ai";
+import { callAI } from "./aiRouter";
 
 export interface JobMatchResult {
   score: number;
   strengths: string[];
   gaps: string[];
   summary: string;
+  /**
+   * False when no AI provider is configured/reachable, so the UI can say so
+   * instead of presenting a fabricated number as a real assessment.
+   */
+  aiAvailable: boolean;
 }
 
 export async function scoreJobMatch(resumeText: string, jobDescription: string): Promise<JobMatchResult> {
@@ -22,7 +27,7 @@ STRENGTHS: <2-4 bullet points, one per line, prefixed with "-">
 GAPS: <2-4 bullet points, one per line, prefixed with "-">
 SUMMARY: <2-sentence honest assessment>`;
 
-  const text = await callGroq(prompt, 500);
+  const text = await callAI(prompt, undefined, 500);
   if (text) {
     const parsed = parseJobMatch(text);
     if (parsed) return parsed;
@@ -43,6 +48,7 @@ function parseJobMatch(text: string): JobMatchResult | null {
     strengths: extractBullets(strengthsMatch?.[1]),
     gaps: extractBullets(gapsMatch?.[1]),
     summary: summaryMatch[1].trim(),
+    aiAvailable: true,
   };
 }
 
@@ -54,12 +60,20 @@ function extractBullets(text?: string): string[] {
     .filter(Boolean);
 }
 
+/**
+ * No AI provider configured/reachable. Returns score 0 with aiAvailable:false
+ * rather than the previous hardcoded 50 — a fabricated mid-range number reads
+ * as a real assessment and is actively misleading. The UI keys off
+ * aiAvailable to show an explanatory state instead of a score.
+ */
 function fallbackJobMatch(): JobMatchResult {
   return {
-    score: 50,
-    strengths: ["Unable to generate a detailed match without a real AI connection."],
-    gaps: ["Add GROQ_API_KEY to get a real, specific assessment."],
-    summary: "This is a placeholder score — connect Groq for a genuine resume/job comparison.",
+    score: 0,
+    strengths: [],
+    gaps: [],
+    summary:
+      "No AI provider is configured, so this resume/job comparison could not be scored. Add a GROQ_API_KEY (or OPENAI/ANTHROPIC/GEMINI key) on the backend to get a real assessment.",
+    aiAvailable: false,
   };
 }
 
@@ -82,10 +96,10 @@ ${jobDescription}
 
 Output ONLY the cover letter body text, no subject line, no "Dear Hiring Manager" boilerplate unless it genuinely fits.`;
 
-  const text = await callGroq(prompt, 500);
+  const text = await callAI(prompt, undefined, 500);
   return (
     text ||
-    `Dear Hiring Team at ${company},\n\nI'm interested in the ${role} position. [Connect GROQ_API_KEY for a real, personalized cover letter grounded in your resume and this job description.]\n\nBest,\n[Your name]`
+    `Dear Hiring Team at ${company},\n\nI'm interested in the ${role} position. [No AI provider configured — add a GROQ_API_KEY (or OPENAI/ANTHROPIC/GEMINI key) on the backend for a real, personalized cover letter grounded in your resume and this job description.]\n\nBest,\n[Your name]`
   );
 }
 
@@ -99,9 +113,9 @@ ${resumeText}
 
 Output ONLY the rewritten resume text.`;
 
-  const text = await callGroq(prompt, 900);
+  const text = await callAI(prompt, undefined, 900);
   return (
     text ||
-    `[Connect GROQ_API_KEY to get a real AI-rewritten version of your resume.]\n\n${resumeText}`
+    `[No AI provider configured — add a GROQ_API_KEY (or OPENAI/ANTHROPIC/GEMINI key) on the backend to get a real AI-rewritten version of your resume.]\n\n${resumeText}`
   );
 }

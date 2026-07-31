@@ -1,5 +1,5 @@
 import { CrmPerson } from "../types/crm";
-import { callGroq } from "./ai";
+import { callAI } from "./aiRouter";
 
 export interface LeadScoreResult {
   score: number;
@@ -44,7 +44,7 @@ Has public email: ${Boolean(person.publicEmail)}
 
 Output ONLY the sentence.`;
 
-  const text = await callGroq(prompt, 80);
+  const text = await callAI(prompt, undefined, 80);
   return {
     score,
     reasoning: text?.trim() || `Rule-based score from priority (${person.priority}/5), status (${person.status}), and recency.`,

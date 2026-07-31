@@ -411,20 +411,21 @@
     const tech = data.techStack ?? {};
     const flatTech = Object.values(tech).flat();
 
-    // Merge contacts: prefer backend if richer, else supplement with local
-    const backendEmails = data.contacts?.emails ?? [];
-    const backendBooking = data.contacts?.booking ?? [];
-    const backendSocial = data.contacts?.social ?? [];
+    // Merge contacts. The backend returns OBJECTS (emails: [{email,type,context}],
+    // socialLinks: [{platform,url}], bookingLinks: [{platform,url}], phones:
+    // [{number,type,raw}]) while local extraction returns plain strings — so
+    // normalize the backend shapes to strings first. Reading the wrong field
+    // names (contacts.social / contacts.booking) previously made these always
+    // undefined, silently discarding every backend-extracted contact.
+    const backendEmails = (data.contacts?.emails ?? []).map((e) => (typeof e === "string" ? e : e.email)).filter(Boolean);
+    const backendBooking = (data.contacts?.bookingLinks ?? []).map((b) => (typeof b === "string" ? b : b.url)).filter(Boolean);
+    const backendSocial = (data.contacts?.socialLinks ?? []).map((s) => (typeof s === "string" ? s : s.url)).filter(Boolean);
+    const backendPhones = (data.contacts?.phones ?? []).map((p) => (typeof p === "string" ? p : p.raw || p.number)).filter(Boolean);
 
-    const mergedEmails = backendEmails.length >= localContacts.emails.length
-      ? backendEmails
-      : [...new Set([...localContacts.emails, ...backendEmails])];
-    const mergedBooking = backendBooking.length >= localContacts.booking.length
-      ? backendBooking
-      : [...new Set([...localContacts.booking, ...backendBooking])];
-    const mergedSocial = backendSocial.length >= localContacts.social.length
-      ? backendSocial
-      : [...new Set([...localContacts.social, ...backendSocial])];
+    const mergedEmails = [...new Set([...backendEmails, ...localContacts.emails])];
+    const mergedBooking = [...new Set([...backendBooking, ...localContacts.booking])];
+    const mergedSocial = [...new Set([...backendSocial, ...localContacts.social])];
+    const mergedPhones = [...new Set(backendPhones)];
 
     const companyName = ai.company_name ?? data.pageTitle ?? data.url ?? window.location.hostname;
     const tagline = ai.tagline ?? "";
@@ -448,10 +449,14 @@
       ? `<div style="display:flex;flex-wrap:wrap;gap:0.3rem;margin-bottom:0.6rem;">${metaTags.map((t) => `<span class="si-meta-tag">${esc(t)}</span>`).join("")}</div>`
       : "";
 
-    const contactsHtml = buildContactsHtml(mergedEmails, mergedBooking, mergedSocial);
+    const contactsHtml = buildContactsHtml(mergedEmails, mergedBooking, mergedSocial, mergedPhones);
 
+    // The dashboard is a single-page app with no router — tab state is React
+    // state, not URL-based — so a deep link like /analyze/<id> just 404s on the
+    // static host. Link to the app root instead; the analysis is already
+    // persisted server-side and appears in the Analyze tab's history.
     const FRONTEND_URL = "https://sales-intel-frontend.onrender.com";
-    const dashUrl = data.id ? `${FRONTEND_URL}/analyze/${data.id}` : FRONTEND_URL;
+    const dashUrl = FRONTEND_URL;
 
     const jsonData = JSON.stringify(data, null, 2);
     const jsonBlob = "data:application/json;charset=utf-8," + encodeURIComponent(jsonData);
@@ -459,6 +464,7 @@
     // Build CSV
     const csvRows = [["type", "value"]];
     mergedEmails.forEach((e) => csvRows.push(["email", e]));
+    mergedPhones.forEach((p) => csvRows.push(["phone", p]));
     mergedBooking.forEach((b) => csvRows.push(["booking", b]));
     mergedSocial.forEach((s) => csvRows.push(["social", s]));
     const csvContent = csvRows.map((r) => r.map((c) => `"${c.replace(/"/g, '""')}"`).join(",")).join("\n");
@@ -520,10 +526,15 @@
     });
   }
 
-  function buildContactsHtml(emails, booking, social) {
+  function buildContactsHtml(emails, booking, social, phones) {
+    phones = phones || [];
     const emailsHtml = emails.length
       ? emails.map((e) => `<div class="si-contact-item"><span class="si-badge si-badge-email">Email</span><a href="mailto:${esc(e)}">${esc(e)}</a></div>`).join("")
       : `<div class="si-empty">No emails detected</div>`;
+
+    const phonesHtml = phones.length
+      ? phones.map((p) => `<div class="si-contact-item"><span class="si-badge si-badge-email">Phone</span><a href="tel:${esc(p)}">${esc(p)}</a></div>`).join("")
+      : `<div class="si-empty">No phone numbers detected</div>`;
 
     const bookingHtml = booking.length
       ? booking.map((b) => `<div class="si-contact-item"><span class="si-badge si-badge-booking">Book</span><a href="${esc(b)}" target="_blank" rel="noopener">${esc(b.replace(/https?:\/\/(www\.)?/, ""))}</a></div>`).join("")
@@ -537,13 +548,17 @@
     const bookCount = booking.length ? `<span style="margin-left:0.3rem;font-size:0.68rem;background:rgba(22,163,74,0.12);color:#16a34a;border-radius:999px;padding:0.05rem 0.4rem;">${booking.length}</span>` : "";
     const socCount = social.length ? `<span style="margin-left:0.3rem;font-size:0.68rem;background:rgba(217,119,6,0.12);color:#d97706;border-radius:999px;padding:0.05rem 0.4rem;">${social.length}</span>` : "";
 
+    const phoneCount = phones.length ? `<span style="margin-left:0.3rem;font-size:0.68rem;background:rgba(139,92,246,0.14);color:#7c3aed;border-radius:999px;padding:0.05rem 0.4rem;">${phones.length}</span>` : "";
+
     return `
       <div class="si-tabs">
         <button class="si-tab active" data-target="si-pane-emails">Emails${emailCount}</button>
+        <button class="si-tab" data-target="si-pane-phones">Phones${phoneCount}</button>
         <button class="si-tab" data-target="si-pane-booking">Booking${bookCount}</button>
         <button class="si-tab" data-target="si-pane-social">Social${socCount}</button>
       </div>
       <div id="si-pane-emails" class="si-tab-pane active">${emailsHtml}</div>
+      <div id="si-pane-phones" class="si-tab-pane">${phonesHtml}</div>
       <div id="si-pane-booking" class="si-tab-pane">${bookingHtml}</div>
       <div id="si-pane-social" class="si-tab-pane">${socialHtml}</div>
     `;

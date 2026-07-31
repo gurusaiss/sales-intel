@@ -99,7 +99,7 @@ function parseModelOutput(text: string, enrichment: EnrichmentResult): AiOutput 
 }
 
 export async function generateFollowUpDraft(person: CrmPerson): Promise<string> {
-  const text = await callGroq(buildFollowUpPrompt(person), 400);
+  const text = await callAI(buildFollowUpPrompt(person), undefined, 400);
   return text || followUpFallback(person);
 }
 
@@ -119,7 +119,7 @@ Write a short email (under 100 words) that naturally references trying LinkedIn 
 SUBJECT: <subject line>
 BODY: <email body>`;
 
-  const text = await callGroq(prompt, 350);
+  const text = await callAI(prompt, undefined, 350);
   if (text) {
     const subjectMatch = text.match(/SUBJECT:\s*([\s\S]*?)(?=BODY:|$)/i);
     const bodyMatch = text.match(/BODY:\s*([\s\S]*)/i);
