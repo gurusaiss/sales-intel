@@ -103,6 +103,3 @@ export async function callAI(prompt: string, system?: string, maxTokens = 1200):
     (await callGemini(prompt, system, maxTokens))
   );
 }
-
-// Keep the old callGroq export for backward compatibility with ai.ts
-export { callGroq as callGroqDirect };

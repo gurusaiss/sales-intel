@@ -227,7 +227,12 @@ export default function CareerView() {
 
         {matchResult && (
           <div className="card highlight" style={{ marginTop: "0.75rem" }}>
-            <span className="card-label">Match score: {matchResult.score}/100</span>
+            {/* Never present a score when no AI provider answered — the backend
+                sends aiAvailable:false instead of a fabricated number, so show
+                the reason rather than a meaningless "0/100". */}
+            <span className="card-label">
+              {matchResult.aiAvailable === false ? "Match score unavailable" : `Match score: ${matchResult.score}/100`}
+            </span>
             <p>{matchResult.summary}</p>
             {matchResult.strengths.length > 0 && (
               <div className="signal-list">

@@ -3,45 +3,9 @@ import { CrmPerson } from "../types/crm";
 import { getTemplateSpec } from "./templates";
 import { callAI } from "./aiRouter";
 
-const GROQ_API_KEY = process.env.GROQ_API_KEY;
-const GROQ_MODEL = process.env.GROQ_MODEL || "llama-3.3-70b-versatile";
-const GROQ_ENDPOINT = "https://api.groq.com/openai/v1/chat/completions";
-
 interface AiOutput {
   aiSummary: string;
   outreachDraft: { subject: string; body: string };
-}
-
-export async function callGroq(prompt: string, maxTokens: number): Promise<string | null> {
-  if (!GROQ_API_KEY) return null;
-
-  try {
-    const res = await fetch(GROQ_ENDPOINT, {
-      method: "POST",
-      headers: {
-        "content-type": "application/json",
-        authorization: `Bearer ${GROQ_API_KEY}`,
-      },
-      body: JSON.stringify({
-        model: GROQ_MODEL,
-        max_tokens: maxTokens,
-        messages: [{ role: "user", content: prompt }],
-      }),
-    });
-
-    if (!res.ok) {
-      console.error("Groq API error", res.status, await res.text());
-      return null;
-    }
-
-    const data = (await res.json()) as {
-      choices: Array<{ message: { content: string } }>;
-    };
-    return data.choices[0]?.message?.content?.trim() ?? null;
-  } catch (err) {
-    console.error("Groq request failed", err);
-    return null;
-  }
 }
 
 export async function generateResearchOutput(enrichment: EnrichmentResult): Promise<AiOutput> {

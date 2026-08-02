@@ -397,6 +397,9 @@ export interface JobMatchResult {
   strengths: string[];
   gaps: string[];
   summary: string;
+  /** False when no AI provider answered — the UI hides the score entirely.
+   *  Optional so a response from an older backend still parses. */
+  aiAvailable?: boolean;
 }
 
 export async function scoreJobMatch(jobDescription: string): Promise<JobMatchResult> {
