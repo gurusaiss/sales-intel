@@ -7,6 +7,7 @@ import { fetchPackageStats } from "./packageStats";
 import { readJson, writeJson } from "./kvStore";
 import { pollDiscoverSources } from "./discoverPoller";
 import { refreshAll } from "./liveData";
+import { enrichHnSignals } from "./hnEnrichment";
 
 async function withGuard(jobName: string, fn: () => Promise<void>): Promise<void> {
   const key = `scheduler:last_run:${jobName}`;
@@ -53,6 +54,11 @@ export function startScheduler(): void {
   // AI trend detection every 2 hours
   cron.schedule("0 */2 * * *", () => {
     void withGuard("trend_detect", () => detectTrendsFromArticles());
+  });
+
+  // HN signal enrichment every 45 minutes (after news has had time to arrive)
+  cron.schedule("*/45 * * * *", () => {
+    void withGuard("hn_enrich", async () => { await enrichHnSignals(30); });
   });
 
   // Package stats every 6 hours

@@ -4,6 +4,7 @@ import { summarizePendingArticles } from "./newsSummarizer";
 import { listTrends, listInnovations } from "./trendStore";
 import { syncGithubTrending, detectTrendsFromArticles } from "./trendDetector";
 import { pollDiscoverSources } from "./discoverPoller";
+import { enrichHnSignals } from "./hnEnrichment";
 
 /**
  * Self-healing data layer.
@@ -91,10 +92,12 @@ export async function refreshAll(): Promise<void> {
     await pollDiscoverSources();
   });
   await run("trends", async () => { await detectTrendsFromArticles(); });
+  // HN enrichment runs after news poll so new articles can get their scores
+  void run("hn_enrich", async () => { await enrichHnSignals(30); });
 }
 
 export function dataStatus(): Record<string, { lastRun: string | null; running: boolean }> {
-  const jobs = ["news_poll", "summarize", "discover", "trends"];
+  const jobs = ["news_poll", "summarize", "discover", "trends", "hn_enrich"];
   const out: Record<string, { lastRun: string | null; running: boolean }> = {};
   for (const j of jobs) {
     out[j] = {
