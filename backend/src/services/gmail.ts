@@ -4,7 +4,7 @@ const CLIENT_ID = process.env.GOOGLE_CLIENT_ID;
 const CLIENT_SECRET = process.env.GOOGLE_CLIENT_SECRET;
 const REDIRECT_URI = process.env.GOOGLE_REDIRECT_URI;
 
-const SCOPE = "https://www.googleapis.com/auth/gmail.send";
+const SCOPE = "https://www.googleapis.com/auth/gmail.send https://www.googleapis.com/auth/calendar.events";
 
 export function isConfigured(): boolean {
   return Boolean(CLIENT_ID && CLIENT_SECRET && REDIRECT_URI);
@@ -72,7 +72,12 @@ export async function isConnected(userId: string): Promise<boolean> {
   return Boolean(tokens?.refreshToken);
 }
 
-async function getValidAccessToken(userId: string): Promise<string> {
+/**
+ * Exported for googleCalendar.ts — same OAuth grant covers both Gmail send
+ * and Calendar events (one combined SCOPE above), so calendar reuses this
+ * instead of running a second OAuth flow.
+ */
+export async function getValidAccessToken(userId: string): Promise<string> {
   const tokens = await readTokens(userId);
   if (!tokens) {
     throw new Error("Gmail not connected. Connect your Google account first.");

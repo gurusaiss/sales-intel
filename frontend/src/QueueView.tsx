@@ -7,6 +7,7 @@ import {
   sendViaGmail,
   addNote,
   logMeeting,
+  scheduleCalendarMeeting,
   downloadPersonsExport,
   downloadAllExport,
   updatePersonTags,
@@ -28,6 +29,8 @@ export default function QueueView() {
   const [noteDraft, setNoteDraft] = useState<Record<string, string>>({});
   const [meetingDate, setMeetingDate] = useState<Record<string, string>>({});
   const [savedNoteId, setSavedNoteId] = useState<string | null>(null);
+  const [schedulingId, setSchedulingId] = useState<string | null>(null);
+  const [scheduledId, setScheduledId] = useState<string | null>(null);
   const [tagDraft, setTagDraft] = useState<Record<string, string>>({});
   const [scores, setScores] = useState<Record<string, LeadScoreResult>>({});
   const [scoringId, setScoringId] = useState<string | null>(null);
@@ -96,6 +99,26 @@ export default function QueueView() {
     await logMeeting(linkedinUrl, date);
     setItems((current) => current.filter((item) => item.person.linkedinUrl !== linkedinUrl));
     setTotalPending((current) => current - 1);
+  }
+
+  async function handleScheduleCalendar(linkedinUrl: string, personId: string) {
+    const dateTime = meetingDate[personId];
+    if (!dateTime) {
+      setError("Pick a date/time first.");
+      return;
+    }
+    setSchedulingId(personId);
+    setError(null);
+    try {
+      await scheduleCalendarMeeting(linkedinUrl, new Date(dateTime).toISOString());
+      setScheduledId(personId);
+      setItems((current) => current.filter((item) => item.person.linkedinUrl !== linkedinUrl));
+      setTotalPending((current) => current - 1);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to schedule meeting");
+    } finally {
+      setSchedulingId(null);
+    }
   }
 
   async function handleExport(format: "csv" | "json") {
@@ -167,7 +190,7 @@ export default function QueueView() {
 
       {googleStatus?.configured && !googleStatus.connected && (
         <div className="gmail-banner">
-          <span>Connect Gmail to send emails directly from the queue instead of copy-paste.</span>
+          <span>Connect Google to send emails and schedule real Calendar meetings directly from the queue.</span>
           <a className="ghost-button" href={getGoogleConnectUrl()} target="_blank" rel="noreferrer">
             Connect Gmail
           </a>
@@ -299,7 +322,7 @@ export default function QueueView() {
                     {savedNoteId === person.id ? "Saved!" : "Add note"}
                   </button>
                   <input
-                    type="date"
+                    type="datetime-local"
                     className="meeting-input"
                     value={meetingDate[person.id] ?? ""}
                     onChange={(e) =>
@@ -311,6 +334,22 @@ export default function QueueView() {
                     onClick={() => handleLogMeeting(person.linkedinUrl, person.id)}
                   >
                     Log meeting
+                  </button>
+                  <button
+                    className="ghost-button accent"
+                    disabled={!googleStatus?.connected || schedulingId === person.id}
+                    title={
+                      !googleStatus?.connected
+                        ? "Connect Gmail/Calendar above first"
+                        : "Creates a real Google Calendar event with a Meet link"
+                    }
+                    onClick={() => handleScheduleCalendar(person.linkedinUrl, person.id)}
+                  >
+                    {scheduledId === person.id
+                      ? "Scheduled!"
+                      : schedulingId === person.id
+                        ? "Scheduling…"
+                        : "Schedule on Calendar"}
                   </button>
                 </div>
               </section>

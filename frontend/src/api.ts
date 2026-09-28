@@ -229,6 +229,28 @@ export async function logMeeting(
   return data.person;
 }
 
+export interface CalendarEventResult {
+  eventId: string;
+  htmlLink: string;
+  meetLink?: string;
+}
+
+export async function scheduleCalendarMeeting(
+  linkedinUrl: string,
+  startIso: string,
+  durationMinutes = 30
+): Promise<{ person: CrmPerson; event: CalendarEventResult }> {
+  const res = await fetch(
+    `${API_BASE}/api/persons/${encodeURIComponent(linkedinUrl)}/meetings/schedule`,
+    {
+      method: "POST",
+      headers: authHeaders({ "content-type": "application/json" }),
+      body: JSON.stringify({ startIso, durationMinutes }),
+    }
+  );
+  return handleResponse(res);
+}
+
 export interface TemplateStat {
   category: string;
   attempted: number;

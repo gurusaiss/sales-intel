@@ -17,6 +17,8 @@ import { requireApiKey } from "../middleware/apiKey";
 import { logAction } from "../services/auditLog";
 import { scoreLead } from "../services/leadScoring";
 import { listLeads } from "../services/leadStore";
+import { createCalendarEvent } from "../services/googleCalendar";
+import { isConnected } from "../services/gmail";
 
 const router = Router();
 
@@ -282,6 +284,64 @@ router.post("/persons/:linkedinUrl/meetings", requireApiKey, async (req, res) =>
     status: "booked",
   });
   res.json({ person: updated });
+});
+
+const scheduleMeetingSchema = z.object({
+  startIso: z.string().trim().min(1),
+  durationMinutes: z.number().min(5).max(480).default(30),
+  notes: z.string().trim().optional(),
+});
+
+/**
+ * Real Google Calendar integration (same OAuth grant as Gmail send, free —
+ * no billing). Always a manual click from the queue, never scheduled or
+ * triggered automatically, same as every other outbound action in this app.
+ */
+router.post("/persons/:linkedinUrl/meetings/schedule", requireApiKey, async (req, res) => {
+  const parsed = scheduleMeetingSchema.safeParse(req.body);
+  if (!parsed.success) {
+    return res.status(400).json({ error: parsed.error.issues[0]?.message ?? "Invalid request" });
+  }
+
+  const linkedinUrl = decodeURIComponent(req.params.linkedinUrl);
+  const person = await getPerson(req.userId, linkedinUrl);
+  if (!person) return res.status(404).json({ error: "Person not found" });
+
+  if (!(await isConnected(req.userId))) {
+    return res.status(400).json({ error: "Connect Google Calendar (via the Gmail connect button) first." });
+  }
+
+  try {
+    const event = await createCalendarEvent(req.userId, {
+      summary: `Meeting with ${person.name}${person.company ? ` (${person.company})` : ""}`,
+      description: parsed.data.notes,
+      startIso: parsed.data.startIso,
+      durationMinutes: parsed.data.durationMinutes,
+      attendeeEmail: person.publicEmail,
+    });
+
+    const meetingNote = [
+      parsed.data.notes,
+      `Google Calendar: ${event.htmlLink}`,
+      event.meetLink ? `Meet link: ${event.meetLink}` : undefined,
+    ]
+      .filter(Boolean)
+      .join(" — ");
+
+    const updated = await updatePerson(req.userId, linkedinUrl, {
+      meetings: [
+        ...person.meetings,
+        { date: parsed.data.startIso, type: "video call", notes: meetingNote },
+      ],
+      status: "booked",
+    });
+
+    await logAction(req.userId, "meeting_scheduled", `Scheduled Google Calendar meeting with ${person.name}`);
+    res.json({ person: updated, event });
+  } catch (err) {
+    console.error("Calendar scheduling failed", err);
+    res.status(500).json({ error: err instanceof Error ? err.message : "Failed to schedule meeting." });
+  }
 });
 
 const draftSchema = captureSchema.extend({
