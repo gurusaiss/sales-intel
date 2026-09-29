@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from "react";
+import OnboardingChecklist from "./OnboardingChecklist";
 
 const API_BASE = (import.meta.env.VITE_API_BASE ?? "http://localhost:4000") + "/api";
 const API_KEY = import.meta.env.VITE_APP_API_KEY ?? "";
@@ -140,6 +141,7 @@ export default function DashboardView({ onNavigate }: { onNavigate?: (tab: Tab) 
 
   return (
     <div className="dash">
+      {onNavigate && <OnboardingChecklist onNavigate={(t) => onNavigate(t as Tab)} />}
       {catchUp && !catchUpDismissed && catchUpParts.length > 0 && (
         <div className="catchup-strip">
           <span className="catchup-icon">👋</span>

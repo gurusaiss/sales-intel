@@ -1,14 +1,15 @@
 import { useState, useEffect, type FormEvent } from "react";
-import { signupUser, loginUser, logoutUser, fetchCurrentUser } from "./api";
+import { signupUser, loginUser, logoutUser, fetchCurrentUser, requestPasswordReset } from "./api";
 
 export default function AuthBar() {
   const [loggedIn, setLoggedIn] = useState(false);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [mode, setMode] = useState<"login" | "signup">("login");
+  const [mode, setMode] = useState<"login" | "signup" | "forgot">("login");
   const [showForm, setShowForm] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const [resetSent, setResetSent] = useState(false);
 
   useEffect(() => {
     fetchCurrentUser()
@@ -21,10 +22,19 @@ export default function AuthBar() {
     setError(null);
     setLoading(true);
     try {
-      if (mode === "signup") await signupUser(email, password);
-      else await loginUser(email, password);
-      setLoggedIn(true);
-      setShowForm(false);
+      if (mode === "forgot") {
+        await requestPasswordReset(email);
+        setResetSent(true);
+      } else if (mode === "signup") {
+        const ref = localStorage.getItem("referralCode") ?? undefined;
+        await signupUser(email, password, ref);
+        setLoggedIn(true);
+        setShowForm(false);
+      } else {
+        await loginUser(email, password);
+        setLoggedIn(true);
+        setShowForm(false);
+      }
       setPassword("");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed");
@@ -69,24 +79,42 @@ export default function AuthBar() {
             onChange={(e) => setEmail(e.target.value)}
             required
           />
-          <input
-            type="password"
-            placeholder="Password"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            minLength={6}
-            required
-          />
-          <button type="submit" disabled={loading}>
-            {loading ? "…" : mode === "login" ? "Log in" : "Sign up"}
-          </button>
-          <button
-            type="button"
-            className="ghost-button"
-            onClick={() => setMode(mode === "login" ? "signup" : "login")}
-          >
-            {mode === "login" ? "Need an account?" : "Have an account?"}
-          </button>
+          {mode !== "forgot" && (
+            <input
+              type="password"
+              placeholder="Password"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              minLength={6}
+              required
+            />
+          )}
+          {resetSent ? (
+            <span className="form-hint">Check your email for a reset link.</span>
+          ) : (
+            <button type="submit" disabled={loading}>
+              {loading ? "…" : mode === "login" ? "Log in" : mode === "signup" ? "Sign up" : "Send reset link"}
+            </button>
+          )}
+          {mode !== "forgot" && (
+            <button
+              type="button"
+              className="ghost-button"
+              onClick={() => setMode(mode === "login" ? "signup" : "login")}
+            >
+              {mode === "login" ? "Need an account?" : "Have an account?"}
+            </button>
+          )}
+          {mode === "login" && (
+            <button type="button" className="ghost-button" onClick={() => setMode("forgot")}>
+              Forgot password?
+            </button>
+          )}
+          {mode === "forgot" && (
+            <button type="button" className="ghost-button" onClick={() => { setMode("login"); setResetSent(false); }}>
+              Back to log in
+            </button>
+          )}
           <button type="button" className="ghost-button" onClick={() => setShowForm(false)}>
             Cancel
           </button>

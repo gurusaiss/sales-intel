@@ -3,6 +3,7 @@ import { z } from "zod";
 import PDFDocument from "pdfkit";
 import { requireApiKey } from "../middleware/apiKey";
 import { createRateLimit } from "../middleware/rateLimit";
+import { enforceMonthlyLimit } from "../middleware/usageLimit";
 import { createAnalysis, getAnalysis, listAnalyses } from "../services/analysisStore";
 import { runAnalysis } from "../services/websiteAnalyzer";
 import { getContactsByAnalysis, exportContactsAsCsv, exportContactsAsMarkdown } from "../services/contactStore";
@@ -19,7 +20,7 @@ const analyzeSchema = z.object({
   url: z.string().url("Must be a valid URL"),
 });
 
-router.post("/analyze", requireApiKey, analyzeLimiter, async (req, res) => {
+router.post("/analyze", requireApiKey, analyzeLimiter, enforceMonthlyLimit("reportsPerMonth"), async (req, res) => {
   const parsed = analyzeSchema.safeParse(req.body);
   if (!parsed.success) return res.status(400).json({ error: parsed.error.issues[0]?.message ?? "Invalid URL" });
 

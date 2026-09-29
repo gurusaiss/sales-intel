@@ -15,6 +15,9 @@ import reportsRouter from "./routes/reports";
 import personalizationRouter from "./routes/personalization";
 import contentSearchRouter from "./routes/contentSearch";
 import liveRouter from "./routes/live";
+import billingRouter from "./routes/billing";
+import adminRouter from "./routes/admin";
+import accountRouter from "./routes/account";
 import { resolveUser } from "./middleware/auth";
 import { rateLimit } from "./middleware/rateLimit";
 import { startScheduler } from "./services/scheduler";
@@ -23,6 +26,11 @@ const app = express();
 const PORT = process.env.PORT ? Number(process.env.PORT) : 4000;
 
 app.use(cors());
+
+// Stripe webhook needs the exact raw request bytes for signature
+// verification, so it's mounted with express.raw() BEFORE express.json()
+// below — every other route gets the normal parsed-JSON body.
+app.use("/api/billing/webhook", express.raw({ type: "application/json" }));
 app.use(express.json());
 
 app.get("/health", (_req, res) => res.json({ status: "ok" }));
@@ -49,6 +57,9 @@ app.use("/api", reportsRouter);
 app.use("/api", personalizationRouter);
 app.use("/api", contentSearchRouter);
 app.use("/api", liveRouter);
+app.use("/api", billingRouter);
+app.use("/api", adminRouter);
+app.use("/api", accountRouter);
 
 app.listen(PORT, () => {
   console.log(`Backend listening on http://localhost:${PORT}`);

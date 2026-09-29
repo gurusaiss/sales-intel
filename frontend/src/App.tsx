@@ -14,10 +14,16 @@ import DiscoverView from "./DiscoverView";
 import ReportsView from "./ReportsView";
 import SearchView from "./SearchView";
 import SavedView from "./SavedView";
+import PricingView from "./PricingView";
+import AccountView from "./AccountView";
+import AdminView from "./AdminView";
+import LegalView from "./LegalView";
+import ResetPasswordPage from "./ResetPasswordPage";
+import VerifyEmailPage from "./VerifyEmailPage";
 import { ToastContainer } from "./components/Toast";
 import "./App.css";
 
-type Tab = "home" | "research" | "companies" | "analyze" | "newstrends" | "discover" | "reports" | "search" | "saved" | "queue" | "analytics" | "career" | "history";
+type Tab = "home" | "research" | "companies" | "analyze" | "newstrends" | "discover" | "reports" | "search" | "saved" | "queue" | "analytics" | "career" | "history" | "pricing" | "account" | "admin" | "legal";
 
 const PAGE_TITLES: Record<Tab, string> = {
   home: "Overview",
@@ -33,6 +39,10 @@ const PAGE_TITLES: Record<Tab, string> = {
   analytics: "Analytics",
   career: "Career Tools",
   history: "History",
+  pricing: "Pricing",
+  account: "Account",
+  admin: "Admin",
+  legal: "Legal & Privacy",
 };
 
 const NAV_GROUPS: { label: string; items: { id: Tab; label: string; icon: string }[] }[] = [
@@ -70,6 +80,15 @@ const NAV_GROUPS: { label: string; items: { id: Tab; label: string; icon: string
     label: "Toolkit",
     items: [{ id: "career", label: "Career", icon: "briefcase" }],
   },
+  {
+    label: "Account",
+    items: [
+      { id: "pricing", label: "Pricing", icon: "chart" },
+      { id: "account", label: "Account", icon: "briefcase" },
+      { id: "admin", label: "Admin", icon: "grid" },
+      { id: "legal", label: "Legal & Privacy", icon: "file" },
+    ],
+  },
 ];
 
 const ICON_PATHS: Record<string, string> = {
@@ -97,6 +116,27 @@ function NavIcon({ name }: { name: string }) {
 }
 
 function App() {
+  const path = typeof window !== "undefined" ? window.location.pathname : "";
+  const params = typeof window !== "undefined" ? new URLSearchParams(window.location.search) : new URLSearchParams();
+
+  // Store a referral code from the URL so it rides along with signup even if
+  // the visitor doesn't sign up on their first visit to this link.
+  useEffect(() => {
+    const ref = params.get("ref");
+    if (ref) localStorage.setItem("referralCode", ref);
+  }, []);
+
+  if (path === "/reset-password" && params.get("token")) {
+    return <ResetPasswordPage token={params.get("token")!} />;
+  }
+  if (path === "/verify-email" && params.get("token")) {
+    return <VerifyEmailPage token={params.get("token")!} />;
+  }
+
+  return <AppShell />;
+}
+
+function AppShell() {
   const [tab, setTab] = useState<Tab>("home");
   const [navOpen, setNavOpen] = useState(false);
   const [query, setQuery] = useState("");
@@ -258,6 +298,16 @@ function App() {
             <SearchView />
           ) : tab === "saved" ? (
             <SavedView />
+          ) : tab === "pricing" ? (
+            <PricingView />
+          ) : tab === "account" ? (
+            <AccountView />
+          ) : tab === "admin" ? (
+            <AdminView />
+          ) : tab === "legal" ? (
+            <LegalView />
+          ) : tab === "analytics" ? (
+            <AnalyticsView />
           ) : (
             <AnalyticsView />
           )}

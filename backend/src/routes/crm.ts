@@ -19,6 +19,9 @@ import { scoreLead } from "../services/leadScoring";
 import { listLeads } from "../services/leadStore";
 import { createCalendarEvent } from "../services/googleCalendar";
 import { isConnected } from "../services/gmail";
+import { isBillingConfigured, TIER_LIMITS } from "../services/billing";
+import { getUserById } from "../services/userStore";
+import { enforceMonthlyLimit } from "../middleware/usageLimit";
 
 const router = Router();
 
@@ -190,6 +193,24 @@ router.post("/persons/capture", requireApiKey, async (req, res) => {
     return res.status(400).json({ error: parsed.error.issues[0]?.message ?? "Invalid request" });
   }
 
+  // Contacts are a running total, not a monthly counter, so this checks the
+  // current count directly rather than using enforceMonthlyLimit — but only
+  // blocks genuinely NEW contacts; updating an already-tracked person (e.g.
+  // a fresh message capture) must never be blocked by a tier cap.
+  if (isBillingConfigured() && req.userId !== "default") {
+    const existing = await getPerson(req.userId, parsed.data.linkedinUrl);
+    if (!existing) {
+      const [user, all] = await Promise.all([getUserById(req.userId), listPersons(req.userId)]);
+      const limit = TIER_LIMITS[user?.tier ?? "free"].contacts;
+      if (all.length >= limit) {
+        return res.status(402).json({
+          error: `You've reached your ${user?.tier ?? "free"} plan's contact limit (${limit}). Upgrade to track more people.`,
+          upgradeRequired: true,
+        });
+      }
+    }
+  }
+
   try {
     const person = await captureOrUpdatePerson(req.userId, parsed.data);
     await logAction(req.userId, "person_captured", `Captured/updated ${person.name} (${person.linkedinUrl})`);
@@ -350,7 +371,7 @@ const draftSchema = captureSchema.extend({
     .optional(),
 });
 
-router.post("/draft", requireApiKey, async (req, res) => {
+router.post("/draft", requireApiKey, enforceMonthlyLimit("draftsPerMonth"), async (req, res) => {
   const parsed = draftSchema.safeParse(req.body);
   if (!parsed.success) {
     return res.status(400).json({ error: parsed.error.issues[0]?.message ?? "Invalid request" });

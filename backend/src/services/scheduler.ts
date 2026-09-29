@@ -8,6 +8,7 @@ import { readJson, writeJson } from "./kvStore";
 import { pollDiscoverSources } from "./discoverPoller";
 import { refreshAll } from "./liveData";
 import { enrichHnSignals } from "./hnEnrichment";
+import { sendWeeklyDigests } from "./digestService";
 
 async function withGuard(jobName: string, fn: () => Promise<void>): Promise<void> {
   const key = `scheduler:last_run:${jobName}`;
@@ -83,6 +84,11 @@ export function startScheduler(): void {
         await generateReport(t);
       }
     });
+  });
+
+  // Per-user weekly digest (opt-in only) every Monday at 8am
+  cron.schedule("0 8 * * 1", () => {
+    void withGuard("weekly_digest", () => sendWeeklyDigests());
   });
 
   console.log("[scheduler] All cron jobs started");

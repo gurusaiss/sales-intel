@@ -87,17 +87,55 @@ export interface AuthUser {
   id: string;
   email: string;
   createdAt: string;
+  emailVerified: boolean;
+  tier: "free" | "pro" | "team";
 }
 
-export async function signupUser(email: string, password: string): Promise<AuthUser> {
+export async function signupUser(email: string, password: string, ref?: string): Promise<AuthUser> {
   const res = await fetch(`${API_BASE}/api/auth/signup`, {
     method: "POST",
     headers: authHeaders({ "content-type": "application/json" }),
-    body: JSON.stringify({ email, password }),
+    body: JSON.stringify({ email, password, ref }),
   });
   const data = await handleResponse<{ user: AuthUser; token: string }>(res);
   setSessionToken(data.token);
   return data.user;
+}
+
+export async function resendVerificationEmail(): Promise<void> {
+  const res = await fetch(`${API_BASE}/api/auth/resend-verification`, {
+    method: "POST",
+    headers: authHeaders(),
+  });
+  await handleResponse(res);
+}
+
+export async function verifyEmail(token: string): Promise<void> {
+  const res = await fetch(`${API_BASE}/api/auth/verify-email`, {
+    method: "POST",
+    headers: authHeaders({ "content-type": "application/json" }),
+    body: JSON.stringify({ token }),
+  });
+  await handleResponse(res);
+}
+
+export async function requestPasswordReset(email: string): Promise<void> {
+  const res = await fetch(`${API_BASE}/api/auth/forgot-password`, {
+    method: "POST",
+    headers: authHeaders({ "content-type": "application/json" }),
+    body: JSON.stringify({ email }),
+  });
+  await handleResponse(res);
+}
+
+export async function resetPassword(token: string, newPassword: string): Promise<void> {
+  const res = await fetch(`${API_BASE}/api/auth/reset-password`, {
+    method: "POST",
+    headers: authHeaders({ "content-type": "application/json" }),
+    body: JSON.stringify({ token, newPassword }),
+  });
+  const data = await handleResponse<{ token: string }>(res);
+  setSessionToken(data.token);
 }
 
 export async function loginUser(email: string, password: string): Promise<AuthUser> {
@@ -130,7 +168,12 @@ export async function refreshSession(): Promise<string | null> {
   return data.token;
 }
 
-export async function fetchCurrentUser(): Promise<{ userId: string; loggedIn: boolean }> {
+export async function fetchCurrentUser(): Promise<{
+  userId: string;
+  loggedIn: boolean;
+  emailVerified?: boolean;
+  tier?: "free" | "pro" | "team";
+}> {
   const res = await fetch(`${API_BASE}/api/auth/me`, { headers: authHeaders() });
   return handleResponse(res);
 }
@@ -635,4 +678,97 @@ export async function addTopicFollow(topic: string) {
 
 export async function removeTopicFollow(id: string) {
   return apiFetch(`/me/follows/${id}`, { method: "DELETE" });
+}
+
+// ── Billing ──────────────────────────────────────────────
+export interface TierLimits {
+  contacts: number;
+  draftsPerMonth: number;
+  reportsPerMonth: number;
+}
+
+export interface BillingStatus {
+  configured: boolean;
+  limits: Record<"free" | "pro" | "team", TierLimits>;
+}
+
+export function fetchBillingStatus() {
+  return apiFetch("/billing/status") as Promise<BillingStatus>;
+}
+
+export async function startCheckout(tier: "pro" | "team"): Promise<string> {
+  const data = (await apiFetch("/billing/checkout", {
+    method: "POST",
+    body: JSON.stringify({ tier }),
+  })) as { url: string };
+  return data.url;
+}
+
+export async function openBillingPortal(): Promise<string> {
+  const data = (await apiFetch("/billing/portal", { method: "POST" })) as { url: string };
+  return data.url;
+}
+
+// ── Account (settings, referral, export, delete) ──────────────────────────
+export interface UserSettings {
+  digestEnabled: boolean;
+  slackWebhookUrl?: string;
+}
+
+export function fetchAccountSettings() {
+  return apiFetch("/account/settings") as Promise<UserSettings>;
+}
+
+export function updateAccountSettings(patch: Partial<UserSettings>) {
+  return apiFetch("/account/settings", { method: "PATCH", body: JSON.stringify(patch) }) as Promise<UserSettings>;
+}
+
+export interface ReferralStats {
+  code: string;
+  referredCount: number;
+  convertedCount: number;
+}
+
+export function fetchReferralStats() {
+  return apiFetch("/account/referral") as Promise<ReferralStats>;
+}
+
+export async function downloadAccountExport(): Promise<void> {
+  const res = await fetch(`${API_BASE}/api/account/export`, { headers: authHeaders() });
+  if (!res.ok) {
+    const body = await res.json().catch(() => ({}));
+    throw new Error(body.error ?? `Export failed with status ${res.status}`);
+  }
+  const blob = await res.blob();
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = "my-account-data.json";
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  URL.revokeObjectURL(url);
+}
+
+export async function deleteAccount(password: string): Promise<void> {
+  const res = await fetch(`${API_BASE}/api/account`, {
+    method: "DELETE",
+    headers: authHeaders({ "content-type": "application/json" }),
+    body: JSON.stringify({ password }),
+  });
+  await handleResponse(res);
+  setSessionToken(null);
+}
+
+// ── Admin (operator view) ──────────────────────────────────────────────
+export interface AdminSummary {
+  totalUsers: number;
+  tierCounts: { free: number; pro: number; team: number };
+  verifiedCount: number;
+  signupsByDay: Record<string, number>;
+  payingUsers: number;
+}
+
+export function fetchAdminSummary() {
+  return apiFetch("/admin/summary") as Promise<AdminSummary>;
 }
