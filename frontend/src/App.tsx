@@ -5,6 +5,8 @@ import QueueView from "./QueueView";
 import AnalyticsView from "./AnalyticsView";
 import CompanySearchView from "./CompanySearchView";
 import CareerView from "./CareerView";
+import CompanyIntelView from "./CompanyIntelView";
+import AppsView from "./AppsView";
 import AuthBar from "./AuthBar";
 import HistoryView from "./HistoryView";
 import AnalyzeView from "./AnalyzeView";
@@ -23,7 +25,7 @@ import VerifyEmailPage from "./VerifyEmailPage";
 import { ToastContainer } from "./components/Toast";
 import "./App.css";
 
-type Tab = "home" | "research" | "companies" | "analyze" | "newstrends" | "discover" | "reports" | "search" | "saved" | "queue" | "analytics" | "career" | "history" | "pricing" | "account" | "admin" | "legal";
+type Tab = "home" | "research" | "companies" | "analyze" | "newstrends" | "discover" | "reports" | "search" | "saved" | "queue" | "analytics" | "career" | "history" | "pricing" | "account" | "admin" | "legal" | "apps" | "company-intel";
 
 const PAGE_TITLES: Record<Tab, string> = {
   home: "Overview",
@@ -38,6 +40,8 @@ const PAGE_TITLES: Record<Tab, string> = {
   queue: "Outreach Queue",
   analytics: "Analytics",
   career: "Career Tools",
+  "company-intel": "Company Intelligence",
+  apps: "My Apps",
   history: "History",
   pricing: "Pricing",
   account: "Account",
@@ -74,6 +78,13 @@ const NAV_GROUPS: { label: string; items: { id: Tab; label: string; icon: string
       { id: "saved", label: "Saved", icon: "bookmark" },
       { id: "analytics", label: "Analytics", icon: "chart" },
       { id: "history", label: "History", icon: "clock" },
+    ],
+  },
+  {
+    label: "My Apps",
+    items: [
+      { id: "apps", label: "App Hub", icon: "grid" },
+      { id: "company-intel", label: "Company Intel", icon: "target" },
     ],
   },
   {
@@ -278,6 +289,10 @@ function AppShell() {
                 </p>
               )}
             </>
+          ) : tab === "apps" ? (
+            <AppsView onNavigate={(t) => go(t as Tab)} />
+          ) : tab === "company-intel" ? (
+            <CompanyIntelView />
           ) : tab === "companies" ? (
             <CompanySearchView />
           ) : tab === "queue" ? (
