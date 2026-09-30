@@ -457,8 +457,8 @@ export default function CompanyIntelView() {
                   {(jdResult.keywordGaps as string[] ?? []).map((s) => <span key={s} className="chip-tag">{s}</span>)}
                 </div>
               </div>
-              {jdResult.tailoredPitch && <div className="card highlight" style={{ marginTop: "0.5rem" }}><span className="card-label">Tailored Pitch</span><p>{String(jdResult.tailoredPitch)}</p></div>}
-              {jdResult.resumeAdvice && <div className="card" style={{ marginTop: "0.5rem" }}><span className="card-label">Resume Advice</span><p>{String(jdResult.resumeAdvice)}</p></div>}
+              {!!jdResult.tailoredPitch && <div className="card highlight" style={{ marginTop: "0.5rem" }}><span className="card-label">Tailored Pitch</span><p>{String(jdResult.tailoredPitch)}</p></div>}
+              {!!jdResult.resumeAdvice && <div className="card" style={{ marginTop: "0.5rem" }}><span className="card-label">Resume Advice</span><p>{String(jdResult.resumeAdvice)}</p></div>}
               {(jdResult.interviewFocus as string[] ?? []).length > 0 && (
                 <div style={{ marginTop: "0.75rem" }}>
                   <div className="field-label">Interview Focus Areas</div>
@@ -515,7 +515,7 @@ export default function CompanyIntelView() {
                   );
                 })}
               </div>
-              {cmpResult.verdict && <div className="verdict-box">{String(cmpResult.verdict)}</div>}
+              {!!cmpResult.verdict && <div className="verdict-box">{String(cmpResult.verdict)}</div>}
             </div>
           )}
         </section>
@@ -551,7 +551,7 @@ export default function CompanyIntelView() {
                   <div style={{ fontWeight: 700 }}>{String(salResult.level)}</div>
                 </div>
               </div>
-              {salResult.breakdown && <div className="card" style={{ marginBottom: "0.75rem" }}><span className="card-label">Breakdown</span><p style={{ fontSize: "0.88rem" }}>{String(salResult.breakdown)}</p></div>}
+              {!!salResult.breakdown && <div className="card" style={{ marginBottom: "0.75rem" }}><span className="card-label">Breakdown</span><p style={{ fontSize: "0.88rem" }}>{String(salResult.breakdown)}</p></div>}
               {(salResult.negotiationTips as string[] ?? []).length > 0 && (
                 <div style={{ marginBottom: "0.75rem" }}>
                   <div className="field-label">Negotiation Tips</div>
