@@ -14,6 +14,26 @@ async function apiFetch(path: string, opts?: RequestInit) {
   return res.json();
 }
 
+// For PDF upload (multipart — no content-type header, browser sets boundary)
+async function apiUploadPdf(path: string, formData: FormData) {
+  const token = localStorage.getItem("sessionToken");
+  const headers: Record<string, string> = {};
+  if (API_KEY) headers["x-api-key"] = API_KEY;
+  if (token) headers["authorization"] = `Bearer ${token}`;
+  const res = await fetch(`${API_BASE}${path}`, { method: "POST", headers, body: formData });
+  if (!res.ok) throw new Error(await res.text());
+  return res.json();
+}
+
+// Trigger a file download from a blob URL
+function downloadBlob(content: string, filename: string, mimeType: string) {
+  const blob = new Blob([content], { type: mimeType });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url; a.download = filename; a.click();
+  URL.revokeObjectURL(url);
+}
+
 interface CIQReport {
   overview?: string;
   founders?: string;
@@ -37,6 +57,8 @@ interface CIQJob {
   status: "pending" | "researching" | "analyzing" | "done" | "failed";
   report?: CIQReport;
   errorMessage?: string;
+  shareToken?: string;
+  isPublic?: boolean;
   createdAt: string;
 }
 
@@ -77,7 +99,21 @@ interface SalaryResult {
   sources: string[];
 }
 
-type ActiveTool = "intel" | "jdfit" | "compare" | "salary" | "coverletter";
+type AppStatus = "saved" | "applied" | "interview" | "offer" | "rejected";
+
+interface CIQApplication {
+  id: string;
+  company: string;
+  role: string;
+  status: AppStatus;
+  notes: string;
+  jobId?: string;
+  nextActionAt?: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+type ActiveTool = "intel" | "jdfit" | "compare" | "salary" | "coverletter" | "tracker";
 
 interface SectionDef {
   key: keyof CIQReport;
@@ -86,24 +122,35 @@ interface SectionDef {
 }
 
 const SECTIONS: SectionDef[] = [
-  { key: "overview",           num: "01", label: "Company Overview" },
-  { key: "founders",           num: "02", label: "Founders & Leadership" },
-  { key: "originStory",        num: "03", label: "Origin Story & Growth" },
-  { key: "challenges",         num: "04", label: "Past Challenges" },
-  { key: "productsProjects",   num: "05", label: "Products & Projects" },
-  { key: "roadmap",            num: "06", label: "Future Roadmap" },
-  { key: "competitive",        num: "07", label: "Competitive Landscape" },
-  { key: "struggles",          num: "08", label: "Current Struggles" },
-  { key: "culture",            num: "10", label: "Culture & Work Life" },
-  { key: "redFlags",           num: "11", label: "Red Flags & Due Diligence" },
-  { key: "applicationStrategy",num: "12", label: "Application Strategy" },
-  { key: "candidateFit",       num: "13", label: "Candidate Fit Analysis" },
+  { key: "overview",            num: "01", label: "Company Overview" },
+  { key: "founders",            num: "02", label: "Founders & Leadership" },
+  { key: "originStory",         num: "03", label: "Origin Story & Growth" },
+  { key: "challenges",          num: "04", label: "Past Challenges" },
+  { key: "productsProjects",    num: "05", label: "Products & Projects" },
+  { key: "roadmap",             num: "06", label: "Future Roadmap" },
+  { key: "competitive",         num: "07", label: "Competitive Landscape" },
+  { key: "struggles",           num: "08", label: "Current Struggles" },
+  { key: "culture",             num: "10", label: "Culture & Work Life" },
+  { key: "redFlags",            num: "11", label: "Red Flags & Due Diligence" },
+  { key: "applicationStrategy", num: "12", label: "Application Strategy" },
+  { key: "candidateFit",        num: "13", label: "Candidate Fit Analysis" },
+];
+
+const APP_COLUMNS: { status: AppStatus; label: string }[] = [
+  { status: "saved",     label: "Saved" },
+  { status: "applied",   label: "Applied" },
+  { status: "interview", label: "Interview" },
+  { status: "offer",     label: "Offer" },
+  { status: "rejected",  label: "Rejected" },
 ];
 
 export default function CompanyIntelView() {
   const [activeTool, setActiveTool] = useState<ActiveTool>("intel");
   const [resumeText, setResumeText] = useState(() => localStorage.getItem("ciq_resume") ?? "");
   const [resumeEditing, setResumeEditing] = useState(() => !localStorage.getItem("ciq_resume"));
+  const [pdfUploading, setPdfUploading] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
   const [history, setHistory] = useState<CIQJob[]>([]);
   const [activeJob, setActiveJob] = useState<CIQJob | null>(null);
   const [expandedSection, setExpandedSection] = useState<string | null>("overview");
@@ -114,6 +161,8 @@ export default function CompanyIntelView() {
   // Intel tool state
   const [companyName, setCompanyName] = useState("");
   const [submitting, setSubmitting] = useState(false);
+  const [sharing, setSharing] = useState(false);
+  const [exporting, setExporting] = useState<string | null>(null);
 
   // JD Fit state
   const [jdText, setJdText] = useState("");
@@ -138,11 +187,14 @@ export default function CompanyIntelView() {
   const [clJdOpen, setClJdOpen] = useState(false);
   const [clResult, setClResult] = useState<string | null>(null);
 
-  useEffect(() => { loadHistory(); }, []);
+  // Application tracker state
+  const [apps, setApps] = useState<CIQApplication[]>([]);
+  const [newApp, setNewApp] = useState({ company: "", role: "", notes: "" });
+  const [appLoading, setAppLoading] = useState(false);
 
-  useEffect(() => {
-    localStorage.setItem("ciq_resume", resumeText);
-  }, [resumeText]);
+  useEffect(() => { loadHistory(); }, []);
+  useEffect(() => { if (activeTool === "tracker") loadApps(); }, [activeTool]);
+  useEffect(() => { localStorage.setItem("ciq_resume", resumeText); }, [resumeText]);
 
   async function loadHistory() {
     try {
@@ -150,6 +202,34 @@ export default function CompanyIntelView() {
       setHistory(data);
     } catch { /* silent */ }
   }
+
+  async function loadApps() {
+    try {
+      const data = await apiFetch("/ciq/applications") as CIQApplication[];
+      setApps(data);
+    } catch { /* silent */ }
+  }
+
+  // ── PDF Resume Upload ─────────────────────────────────────────────────────
+
+  async function handlePdfUpload(file: File) {
+    if (!file || file.type !== "application/pdf") { toast("Only PDF files", "error"); return; }
+    setPdfUploading(true);
+    try {
+      const fd = new FormData();
+      fd.append("resume", file);
+      const r = await apiUploadPdf("/ciq/resume/parse", fd) as { text: string; chars: number };
+      setResumeText(r.text);
+      setResumeEditing(false);
+      toast(`Resume extracted — ${r.chars.toLocaleString()} characters`, "success");
+    } catch (err) {
+      toast(err instanceof Error ? err.message : "PDF parse failed", "error");
+    } finally {
+      setPdfUploading(false);
+    }
+  }
+
+  // ── Polling ───────────────────────────────────────────────────────────────
 
   function startPolling(jobId: string) {
     if (pollRef.current) clearInterval(pollRef.current);
@@ -178,9 +258,11 @@ export default function CompanyIntelView() {
     }, 3000);
   }
 
+  // ── Intel Report ──────────────────────────────────────────────────────────
+
   async function handleStartReport() {
     if (!companyName.trim() || !resumeText.trim()) {
-      toast("Enter company name and paste your resume first", "error");
+      toast("Enter company name and paste (or upload) your resume first", "error");
       return;
     }
     setSubmitting(true);
@@ -215,6 +297,53 @@ export default function CompanyIntelView() {
     if (activeJob?.id === id) setActiveJob(null);
     toast("Deleted", "success");
   }
+
+  async function handleShare() {
+    if (!activeJob) return;
+    setSharing(true);
+    try {
+      if (activeJob.isPublic && activeJob.shareToken) {
+        // Revoke
+        await apiFetch(`/ciq/reports/${activeJob.id}/share`, { method: "DELETE" });
+        setActiveJob((prev) => prev ? { ...prev, isPublic: false, shareToken: undefined } : null);
+        toast("Share link revoked", "success");
+      } else {
+        const { shareToken } = await apiFetch(`/ciq/reports/${activeJob.id}/share`, { method: "POST" }) as { shareToken: string };
+        setActiveJob((prev) => prev ? { ...prev, isPublic: true, shareToken } : null);
+        const url = `${window.location.origin}/share/${shareToken}`;
+        await navigator.clipboard.writeText(url);
+        toast("Share link copied to clipboard!", "success");
+      }
+    } catch (err) {
+      toast(err instanceof Error ? err.message : "Share failed", "error");
+    } finally {
+      setSharing(false);
+    }
+  }
+
+  async function handleExport(format: "md" | "pptx") {
+    if (!activeJob) return;
+    setExporting(format);
+    try {
+      const token = localStorage.getItem("sessionToken");
+      const headers: Record<string, string> = {};
+      if (API_KEY) headers["x-api-key"] = API_KEY;
+      if (token) headers["authorization"] = `Bearer ${token}`;
+      const res = await fetch(`${API_BASE}/ciq/reports/${activeJob.id}/export?format=${format}`, { headers });
+      if (!res.ok) throw new Error(await res.text());
+      const text = await res.text();
+      const safe = activeJob.companyName.replace(/[^a-z0-9]/gi, "_");
+      const filename = format === "md" ? `${safe}_report.md` : `${safe}_ppt_prompt.txt`;
+      downloadBlob(text, filename, format === "md" ? "text/markdown" : "text/plain");
+      toast(`${format === "md" ? "Markdown" : "PPT Prompt"} downloaded`, "success");
+    } catch (err) {
+      toast(err instanceof Error ? err.message : "Export failed", "error");
+    } finally {
+      setExporting(null);
+    }
+  }
+
+  // ── Tool handlers ─────────────────────────────────────────────────────────
 
   async function handleJdFit() {
     if (!resumeText.trim() || !jdText.trim()) { toast("Resume and JD required", "error"); return; }
@@ -256,6 +385,43 @@ export default function CompanyIntelView() {
     finally { setSubmitting(false); }
   }
 
+  // ── Application Tracker ───────────────────────────────────────────────────
+
+  async function addApplication() {
+    if (!newApp.company.trim() || !newApp.role.trim()) { toast("Company and role required", "error"); return; }
+    setAppLoading(true);
+    try {
+      const app = await apiFetch("/ciq/applications", {
+        method: "POST",
+        body: JSON.stringify({ company: newApp.company.trim(), role: newApp.role.trim(), notes: newApp.notes }),
+      }) as CIQApplication;
+      setApps((prev) => [app, ...prev]);
+      setNewApp({ company: "", role: "", notes: "" });
+      toast("Application added", "success");
+    } catch { toast("Failed to add", "error"); }
+    finally { setAppLoading(false); }
+  }
+
+  async function moveApp(id: string, status: AppStatus) {
+    try {
+      const updated = await apiFetch(`/ciq/applications/${id}`, {
+        method: "PATCH",
+        body: JSON.stringify({ status }),
+      }) as CIQApplication;
+      setApps((prev) => prev.map((a) => a.id === id ? updated : a));
+    } catch { toast("Update failed", "error"); }
+  }
+
+  async function deleteApp(id: string) {
+    try {
+      await apiFetch(`/ciq/applications/${id}`, { method: "DELETE" });
+      setApps((prev) => prev.filter((a) => a.id !== id));
+      toast("Removed", "success");
+    } catch { toast("Delete failed", "error"); }
+  }
+
+  // ── Render helpers ────────────────────────────────────────────────────────
+
   const statusLabel: Record<string, string> = {
     pending: "Queued…",
     researching: "Searching the web…",
@@ -272,41 +438,58 @@ export default function CompanyIntelView() {
     ["compare",     "Compare"],
     ["salary",      "Salary"],
     ["coverletter", "Cover Letter"],
+    ["tracker",     "Tracker"],
   ];
 
   return (
     <div className="result">
 
-      {/* Resume — collapsible */}
+      {/* ── Resume Panel ─────────────────────────────────────────── */}
       <section className="card">
         {resumeEditing ? (
           <>
             <div className="ciq-resume-header">
               <h2>Your Resume</h2>
-              {!!resumeText && (
-                <button className="ghost-button" onClick={() => setResumeEditing(false)}>Done</button>
-              )}
+              <div style={{ display: "flex", gap: "0.5rem" }}>
+                <button
+                  className="ghost-button"
+                  onClick={() => fileInputRef.current?.click()}
+                  disabled={pdfUploading}
+                >
+                  {pdfUploading ? "Parsing…" : "Upload PDF"}
+                </button>
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept="application/pdf"
+                  style={{ display: "none" }}
+                  onChange={(e) => { const f = e.target.files?.[0]; if (f) handlePdfUpload(f); e.target.value = ""; }}
+                />
+                {!!resumeText && (
+                  <button className="ghost-button" onClick={() => setResumeEditing(false)}>Done</button>
+                )}
+              </div>
             </div>
-            <p className="subline">Stored locally — used by all CompanyIQ tools.</p>
+            <p className="subline">Paste text or upload PDF — stored locally, used across all tools.</p>
             <textarea
               className="ciq-textarea"
               value={resumeText}
               onChange={(e) => setResumeText(e.target.value)}
-              placeholder="Paste your resume text here…"
+              placeholder="Paste your resume here, or click Upload PDF above…"
               rows={6}
             />
           </>
         ) : (
           <div className="ciq-resume-preview">
             <span className="ciq-resume-preview-text">
-              Resume saved · {resumeText.length} chars
+              Resume saved · {resumeText.length.toLocaleString()} chars
             </span>
             <button className="ghost-button" onClick={() => setResumeEditing(true)}>Edit</button>
           </div>
         )}
       </section>
 
-      {/* Tab bar — underline style */}
+      {/* ── Tab Bar ──────────────────────────────────────────────── */}
       <div className="ciq-tab-bar">
         {TABS.map(([id, label]) => (
           <button
@@ -319,7 +502,7 @@ export default function CompanyIntelView() {
         ))}
       </div>
 
-      {/* ── Company Intel ── */}
+      {/* ── Company Intel ─────────────────────────────────────────── */}
       {activeTool === "intel" && (
         <>
           <section className="card">
@@ -341,7 +524,7 @@ export default function CompanyIntelView() {
 
             {activeJob && activeJob.status !== "done" && activeJob.status !== "failed" && (
               <p className="ciq-status-line">
-                {statusLabel[activeJob.status] ?? activeJob.status} {activeJob.companyName}
+                {statusLabel[activeJob.status] ?? activeJob.status} — {activeJob.companyName}
               </p>
             )}
             {activeJob?.status === "failed" && (
@@ -355,8 +538,55 @@ export default function CompanyIntelView() {
             <section className="card">
               <div className="ciq-report-header">
                 <h2>{activeJob.companyName}</h2>
-                <span className="badge badge-medium">Report ready</span>
+                <div style={{ display: "flex", gap: "0.5rem", alignItems: "center", flexWrap: "wrap" }}>
+                  <button
+                    className="ghost-button"
+                    onClick={() => handleExport("md")}
+                    disabled={!!exporting}
+                  >
+                    {exporting === "md" ? "Exporting…" : "Download MD"}
+                  </button>
+                  <button
+                    className="ghost-button"
+                    onClick={() => handleExport("pptx")}
+                    disabled={!!exporting}
+                  >
+                    {exporting === "pptx" ? "Exporting…" : "PPT Prompt"}
+                  </button>
+                  <button
+                    className="ghost-button"
+                    onClick={handleShare}
+                    disabled={sharing}
+                  >
+                    {sharing ? "…" : activeJob.isPublic ? "Unshare" : "Share Link"}
+                  </button>
+                </div>
               </div>
+
+              {activeJob.isPublic && activeJob.shareToken && (
+                <p className="ciq-status-line" style={{ marginBottom: "0.75rem" }}>
+                  Public link active —{" "}
+                  <a
+                    href={`/share/${activeJob.shareToken}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    style={{ color: "var(--primary)" }}
+                  >
+                    /share/{activeJob.shareToken}
+                  </a>
+                  {" "}·{" "}
+                  <button
+                    className="ghost-button"
+                    style={{ display: "inline", padding: 0, fontSize: "inherit" }}
+                    onClick={async () => {
+                      await navigator.clipboard.writeText(`${window.location.origin}/share/${activeJob.shareToken}`);
+                      toast("Link copied!", "success");
+                    }}
+                  >
+                    Copy
+                  </button>
+                </p>
+              )}
 
               {activeJob.report.raw ? (
                 <pre className="ciq-raw">{activeJob.report.raw}</pre>
@@ -386,7 +616,7 @@ export default function CompanyIntelView() {
                     );
                   })}
 
-                  {/* 09 — Interview Questions */}
+                  {/* 09 — Interview Questions (flashcards) */}
                   {questions.length > 0 && (
                     <div className="ciq-section">
                       <button
@@ -400,16 +630,19 @@ export default function CompanyIntelView() {
                       </button>
                       {expandedSection === "flash" && (
                         <div className="ciq-section-body">
-                          <div className="ciq-flashcard-wrap">
-                            <div
-                              className={`ciq-flashcard${flashFlipped ? " flipped" : ""}`}
-                              onClick={() => setFlashFlipped((f) => !f)}
-                            >
+                          <div
+                            className="ciq-flashcard-wrap"
+                            onClick={() => setFlashFlipped((f) => !f)}
+                          >
+                            <div className={`ciq-flashcard${flashFlipped ? " flipped" : ""}`}>
                               <div className="ciq-card-face ciq-card-front">
                                 <p>{questions[flashcardIdx]}</p>
                               </div>
                               <div className="ciq-card-face ciq-card-back">
-                                <p>{flashcardIdx + 1} / {questions.length}</p>
+                                <p>Tap again to flip back</p>
+                                <p style={{ fontSize: "0.8rem", opacity: 0.7, marginTop: "0.5rem" }}>
+                                  {flashcardIdx + 1} of {questions.length}
+                                </p>
                               </div>
                             </div>
                           </div>
@@ -447,6 +680,7 @@ export default function CompanyIntelView() {
                       <span className="ciq-history-name">{j.companyName}</span>
                       <span className="ciq-history-meta">
                         {new Date(j.createdAt).toLocaleDateString()} · {j.status}
+                        {j.isPublic && " · shared"}
                       </span>
                     </div>
                     <button
@@ -463,7 +697,7 @@ export default function CompanyIntelView() {
         </>
       )}
 
-      {/* ── JD Fit ── */}
+      {/* ── JD Fit ─────────────────────────────────────────────────── */}
       {activeTool === "jdfit" && (
         <section className="card">
           <h2>JD Fit Score</h2>
@@ -499,9 +733,7 @@ export default function CompanyIntelView() {
                   <span className="ciq-score-label">ATS Score</span>
                 </div>
               </div>
-              {!!jdResult.verdict && (
-                <p className="ciq-verdict-line">{jdResult.verdict}</p>
-              )}
+              {!!jdResult.verdict && <p className="ciq-verdict-line">{jdResult.verdict}</p>}
 
               <div className="ciq-skills-grid">
                 <div className="ciq-skill-col">
@@ -552,7 +784,7 @@ export default function CompanyIntelView() {
         </section>
       )}
 
-      {/* ── Compare ── */}
+      {/* ── Compare ──────────────────────────────────────────────── */}
       {activeTool === "compare" && (
         <section className="card">
           <h2>Compare Companies</h2>
@@ -603,7 +835,7 @@ export default function CompanyIntelView() {
         </section>
       )}
 
-      {/* ── Salary ── */}
+      {/* ── Salary ────────────────────────────────────────────────── */}
       {activeTool === "salary" && (
         <section className="card">
           <h2>Salary Intelligence</h2>
@@ -628,7 +860,6 @@ export default function CompanyIntelView() {
                 <span className="badge">{salResult.level}</span>
                 <span className="muted" style={{ fontSize: "0.8rem" }}>Confidence: {salResult.confidenceLevel}</span>
               </div>
-
               {!!salResult.breakdown && (
                 <div className="card highlight" style={{ marginTop: "0.75rem" }}>
                   <span className="card-label">Breakdown</span>
@@ -653,7 +884,7 @@ export default function CompanyIntelView() {
         </section>
       )}
 
-      {/* ── Cover Letter ── */}
+      {/* ── Cover Letter ─────────────────────────────────────────── */}
       {activeTool === "coverletter" && (
         <section className="card">
           <h2>Cover Letter Generator</h2>
@@ -662,11 +893,7 @@ export default function CompanyIntelView() {
             <input type="text" className="query-input" placeholder="Company" value={clCompany} onChange={(e) => setClCompany(e.target.value)} />
             <input type="text" className="query-input" placeholder="Role" value={clRole} onChange={(e) => setClRole(e.target.value)} />
           </div>
-          <button
-            className="ghost-button"
-            style={{ marginBottom: "0.5rem" }}
-            onClick={() => setClJdOpen((v) => !v)}
-          >
+          <button className="ghost-button" style={{ marginBottom: "0.5rem" }} onClick={() => setClJdOpen((v) => !v)}>
             {clJdOpen ? "− Remove job description" : "+ Add job description"}
           </button>
           {clJdOpen && (
@@ -685,17 +912,103 @@ export default function CompanyIntelView() {
             <div className="card highlight" style={{ marginTop: "1rem" }}>
               <div className="ciq-cl-header">
                 <span className="card-label">Cover Letter</span>
-                <button
-                  className="ghost-button"
-                  onClick={() => { navigator.clipboard.writeText(clResult); toast("Copied!", "success"); }}
-                >
-                  Copy
-                </button>
+                <div style={{ display: "flex", gap: "0.5rem" }}>
+                  <button className="ghost-button" onClick={() => { navigator.clipboard.writeText(clResult); toast("Copied!", "success"); }}>
+                    Copy
+                  </button>
+                  <button className="ghost-button" onClick={() => downloadBlob(clResult, `cover_letter_${clCompany.replace(/\s+/g, "_")}.txt`, "text/plain")}>
+                    Download
+                  </button>
+                </div>
               </div>
               <pre className="draft-body">{clResult}</pre>
             </div>
           )}
         </section>
+      )}
+
+      {/* ── Application Tracker ──────────────────────────────────── */}
+      {activeTool === "tracker" && (
+        <>
+          {/* Add new application form */}
+          <section className="card">
+            <h2>Application Tracker</h2>
+            <p className="subline">Track every job you've saved, applied to, or are interviewing for.</p>
+            <div className="tracker-add-form">
+              <input
+                type="text"
+                className="query-input"
+                placeholder="Company"
+                value={newApp.company}
+                onChange={(e) => setNewApp((n) => ({ ...n, company: e.target.value }))}
+              />
+              <input
+                type="text"
+                className="query-input"
+                placeholder="Role"
+                value={newApp.role}
+                onChange={(e) => setNewApp((n) => ({ ...n, role: e.target.value }))}
+              />
+              <input
+                type="text"
+                className="query-input"
+                placeholder="Notes (optional)"
+                value={newApp.notes}
+                onChange={(e) => setNewApp((n) => ({ ...n, notes: e.target.value }))}
+              />
+              <button disabled={appLoading} onClick={addApplication}>
+                {appLoading ? "Adding…" : "+ Add"}
+              </button>
+            </div>
+          </section>
+
+          {/* Kanban board */}
+          <div className="tracker-board">
+            {APP_COLUMNS.map(({ status, label }) => {
+              const col = apps.filter((a) => a.status === status);
+              return (
+                <div key={status} className="tracker-col">
+                  <div className="tracker-col-hdr">
+                    <span className="tracker-col-label">{label}</span>
+                    <span className="tracker-col-count">{col.length}</span>
+                  </div>
+                  <div className="tracker-col-body">
+                    {col.map((app) => (
+                      <div key={app.id} className="tracker-card">
+                        <div className="tracker-card-title">{app.company}</div>
+                        <div className="tracker-card-role">{app.role}</div>
+                        {!!app.notes && (
+                          <div className="tracker-card-notes">{app.notes}</div>
+                        )}
+                        <div className="tracker-card-actions">
+                          <select
+                            className="tracker-select"
+                            value={app.status}
+                            onChange={(e) => moveApp(app.id, e.target.value as AppStatus)}
+                          >
+                            {APP_COLUMNS.map(({ status: s, label: l }) => (
+                              <option key={s} value={s}>{l}</option>
+                            ))}
+                          </select>
+                          <button
+                            className="ghost-button danger"
+                            style={{ fontSize: "0.75rem", padding: "0.2rem 0.5rem" }}
+                            onClick={() => deleteApp(app.id)}
+                          >
+                            ×
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+                    {col.length === 0 && (
+                      <div className="tracker-empty">Nothing here yet</div>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </>
       )}
     </div>
   );

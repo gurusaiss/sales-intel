@@ -9,13 +9,16 @@
     "start": "node dist/index.js"
   },
   "dependencies": {
+    "@types/multer": "^2.3.0",
     "cheerio": "^1.2.0",
     "cors": "^2.8.5",
     "dotenv": "^16.4.5",
     "express": "^4.19.2",
     "fast-xml-parser": "^5.10.0",
+    "multer": "^2.4.0",
     "node-cron": "^4.6.0",
     "node-html-parser": "^9.0.0",
+    "pdf-parse": "^2.4.5",
     "pdfkit": "^0.15.0",
     "rss-parser": "^3.13.0",
     "zod": "^3.23.8"
